@@ -1,0 +1,243 @@
+# Ini++ CI workflow.
+#
+# Kept here (ci/workflows/) instead of .github/workflows/ only so that it can be pushed by
+# automation whose GitHub App token lacks the "workflows" permission; GitHub does not run files
+# outside .github/workflows/.  To enable it, either
+#
+#     mkdir -p .github/workflows && cp ci/workflows/build.yml .github/workflows/build.yml
+#     git add .github/workflows/build.yml && git commit -m "Add CI workflow" && git push
+#
+# with a token that has the workflows permission, or create the file with the GitHub web UI
+# (Actions -> New workflow -> set up a workflow yourself) and paste this file's contents, with the
+# first line of the YAML ("name: Build") at the top.
+name: Build
+
+# Builds, tests and packages Ini++ for both runtimes it supports:
+#   * Windows: INI++.mfx, the classic Fusion 2.5 (Unicode) extension
+#   * Android: CRunINI++.so for the Fusion 2.5 Android exporter's native extension ABI, packaged
+#              as INI++.zip (Data/Runtime/Android/ extension package)
+#
+# The Windows build needs only publicly available sources (the lSDK submodule and MSVC).
+# The Android build additionally needs the *proprietary* <RuntimeNative.h> from the Clickteam
+# Android extension SDK (https://www.clickteam.com/extensions-sdks), which cannot be redistributed
+# with this repository.  Provide it through the repository secret CLICKTEAM_ANDROID_SDK_B64 (a
+# base64-encoded .zip holding RuntimeNative.h, optionally with the headers it includes) or, on a
+# self-hosted runner, through the IPPP_ANDROID_SDK_DIR environment variable.  Without it the
+# "android-extension" job fails with an explanation - it does not silently skip or substitute a
+# stand-in header.  See docs/BUILD.md.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # One place to change the toolchain versions the project is tested with (docs/BUILD.md).
+  # The platform and the ABIs of the extension come from android/jni/Application.mk.
+  NDK_VERSION: "26.1.10909125"
+
+jobs:
+  ace-tables:
+    name: ACE tables (Menus.cpp <-> ACEs.cpp)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the generated Android ACE tables are up to date
+        run: python3 tools/gen_android_aces.py --check
+
+  host-tests:
+    name: Host tests (shared runtime + Android dispatch)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compiler versions
+        run: |
+          g++ --version | head -1
+          python3 --version
+      - name: Build and run the Android runtime host tests
+        run: bash tools/run_host_tests.sh
+      - name: The same tests under AddressSanitizer/UBSan
+        run: SANITIZE=1 bash tools/run_host_tests.sh
+      - name: Smoke-build the extension as a shared object and verify its exports
+        run: bash tools/smoke_build_so.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-smoke-build
+          path: build/android-smoke/CRunINI++.so
+          if-no-files-found: error
+
+  windows-extension:
+    name: Windows MFX (MSVC, Win32)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+      - name: Build the runtime and edittime MFX (MSVC v143, Win32)
+        shell: pwsh
+        # PostBuildEventUseInBuild=false: lSDK's AutoInstall.bat tries to copy the MFX into a local
+        # Fusion installation, which does not exist on a CI runner.
+        # The .vcxproj platform is Win32; the .sln calls the same thing x86
+        # (msbuild INI++15.sln /p:Configuration=Runtime /p:Platform=x86 also works).
+        run: |
+          msbuild INI++15.vcxproj `
+            /m /nologo /v:minimal `
+            /p:Configuration=Runtime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+          msbuild INI++15.vcxproj `
+            /m /nologo /v:minimal `
+            /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+          # Debug additionally compiles the assertion/unimplemented-ACE branches
+          msbuild INI++15.vcxproj `
+            /m /nologo /v:minimal `
+            /p:Configuration=Debug /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+      - name: Collect INI++.mfx (runtime + edittime)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/windows | Out-Null
+          Copy-Item Build/Output/Runtime/INI++15.mfx  dist/windows/INI++.mfx
+          Copy-Item Build/Output/Edittime/INI++15.mfx dist/windows/INI++_edittime.mfx
+          Get-ChildItem dist/windows
+      - name: Check the exports of the edittime MFX
+        shell: pwsh
+        # An MFX that loads in Fusion must export these; a missing export means the .def files and
+        # the build configuration drifted apart.
+        run: |
+          $dumpbin = (Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          if (-not $dumpbin) { throw "dumpbin.exe was not found; cannot verify the MFX exports" }
+          $exports = & $dumpbin /nologo /exports dist/windows/INI++.mfx | Out-String
+          foreach ($symbol in @("GetInfos", "GetRunObjectInfos", "CreateRunObject", "GetRunObjectDataSize")) {
+            if ($exports -notmatch $symbol) { throw "INI++.mfx does not export $symbol" }
+            Write-Host "ok: $symbol"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-mfx
+          path: dist/windows/*.mfx
+          if-no-files-found: error
+
+  android-extension:
+    name: Android extension (NDK, CRunINI++.so)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Obtain the Clickteam Android SDK header
+        id: sdk
+        # <RuntimeNative.h> is proprietary (see the header comment of this file and docs/BUILD.md).
+        # CLICKTEAM_ANDROID_SDK_B64: base64 of a .zip whose root contains RuntimeNative.h, e.g.
+        #   cd /path/to/extracted/sdk && zip -r ../clickteam-android-sdk.zip RuntimeNative.h <includes>
+        #   base64 -w0 ../clickteam-android-sdk.zip   # add as a repository secret
+        # Self-hosted runners may instead set IPPP_ANDROID_SDK_DIR (a directory holding the header,
+        # or the SDK directory itself; tools/build_android.sh finds the header inside it).
+        env:
+          SDK_B64: ${{ secrets.CLICKTEAM_ANDROID_SDK_B64 }}
+          SDK_DIR_VAR: ${{ vars.IPPP_ANDROID_SDK_DIR }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SDK_DIR_VAR:-}" ]; then
+            echo "sdk_dir=$SDK_DIR_VAR" >> "$GITHUB_OUTPUT"
+            echo "Using IPPP_ANDROID_SDK_DIR=$SDK_DIR_VAR"
+            exit 0
+          fi
+          if [ -n "${SDK_B64:-}" ]; then
+            dir="$RUNNER_TEMP/clickteam-android-sdk"
+            mkdir -p "$dir"
+            printf '%s' "$SDK_B64" | base64 -d > "$RUNNER_TEMP/sdk.zip"
+            unzip -q -o "$RUNNER_TEMP/sdk.zip" -d "$dir"
+            echo "sdk_dir=$dir" >> "$GITHUB_OUTPUT"
+            echo "Extracted the Clickteam Android SDK header archive:"
+            find "$dir" -name 'RuntimeNative.h'
+            exit 0
+          fi
+          echo "::error title=Clickteam Android SDK required::The Android extension cannot be compiled without <RuntimeNative.h> from the Clickteam Android extension SDK. It is proprietary and therefore not part of this repository. Add the repository secret CLICKTEAM_ANDROID_SDK_B64 (base64 .zip containing RuntimeNative.h; see ci/workflows/build.yml and docs/BUILD.md), or run on a self-hosted runner with IPPP_ANDROID_SDK_DIR set. android/tests/mock-sdk/RuntimeNative.h is only a host-test stand-in and must not be shipped."
+          exit 1
+
+      - name: Install the Android NDK
+        run: |
+          set -euo pipefail
+          ndk="${ANDROID_NDK_LATEST_HOME:-}"
+          if [ -z "$ndk" ]; then
+            ndk="$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/ndk/* 2>/dev/null | sort -V | tail -1 || true)"
+          fi
+          if [ -z "$ndk" ]; then
+            echo "Installing NDK $NDK_VERSION"
+            yes | "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" > /dev/null
+            ndk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/$NDK_VERSION"
+          fi
+          echo "Using NDK: $ndk"
+          "$ndk/ndk-build" --version | head -2
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+
+      - name: Build the Android extension
+        run: |
+          set -euo pipefail
+          tools/build_android.sh --sdk-dir "${{ steps.sdk.outputs.sdk_dir }}" --out dist/android
+          ls -l dist/android/*/
+
+      - name: Package the Fusion Android extension (Data/Runtime/Android/INI++.zip)
+        # The Fusion 2.5 Android exporter merges ZIP archives from <Fusion>/Data/Runtime/Android/
+        # into the runtime project before building; assets/mmf/<abi>/<name>.so is where the runtime
+        # looks for native extension objects (see ClickteamLLC/android, docs/index.md section 5).
+        run: |
+          set -euo pipefail
+          mkdir -p dist/fusion-android-extension/assets/mmf
+          for abi_dir in dist/android/*/; do
+            abi="$(basename "$abi_dir")"
+            mkdir -p "dist/fusion-android-extension/assets/mmf/$abi"
+            cp "$abi_dir/CRunINI++.so" "dist/fusion-android-extension/assets/mmf/$abi/CRunINI++.so"
+          done
+          (cd dist/fusion-android-extension && zip -r -9 ../INI++.zip .)
+          unzip -l dist/INI++.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-extension
+          path: |
+            dist/INI++.zip
+            dist/android/*/*.so
+          if-no-files-found: error
+
+  package:
+    name: Package release artifacts
+    needs: [host-tests, windows-extension, android-extension]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: Assemble the extension packages
+        run: |
+          set -euo pipefail
+          version="$(git describe --tags --always || true)"
+          root="IniPlusPlus-${version:-dev}"
+          mkdir -p "dist/$root"
+          cp -r windows-mfx/. "dist/$root/windows/"
+          mkdir -p "dist/$root/android"
+          cp -r android-extension/. "dist/$root/android/"
+          cp -r docs "dist/$root/docs"
+          (cd dist && zip -r -9 "$root.zip" "$root")
+          unzip -l "dist/$root.zip"
+          echo "ARTIFACT=dist/$root.zip" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: dist/*.zip
+          if-no-files-found: error
+      - name: Summary
+        run: |
+          {
+            echo "## Ini++ build"
+            echo
+            echo "| artifact | contents |"
+            echo "| --- | --- |"
+            echo "| \`windows-mfx\` | \`INI++.mfx\` (runtime) and \`INI++_edittime.mfx\` (edittime), built with MSVC v143 |"
+            echo "| \`android-extension\` | \`CRunINI++.so\` per ABI and the \`INI++.zip\` Fusion Android extension package |"
+            echo "| \`android-smoke-build\` | host-built .so used to verify the exported entry points |"
+            echo "| \`release-bundle\` | both of the above plus the documentation |"
+            echo
+            echo "Installation: docs/INSTALL.md - limitations: docs/COMPATIBILITY.md"
+          } >> "$GITHUB_STEP_SUMMARY"

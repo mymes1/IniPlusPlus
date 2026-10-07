@@ -14,6 +14,11 @@ using namespace std::string_view_literals;
 
 [[nodiscard]] static std::filesystem::path longify_path(std::filesystem::path p)
 {
+#ifdef FUSION_ANDROID_RUNTIME
+	// The Win32 long-path prefix (\\?\) does not exist on Android, and the Fusion Android
+	// runtime hands out ordinary UTF-8 paths; nothing to do here.
+	return p;
+#else
 	if(p.has_root_path())
 	{
 		auto const root_path{p.root_path()};
@@ -25,6 +30,7 @@ using namespace std::string_view_literals;
 		}
 	}
 	return p;
+#endif
 }
 
 [[nodiscard]] static std::filesystem::path get_known_folder(::KNOWNFOLDERID const& id)
@@ -410,7 +416,7 @@ void Data::load(lSDK::string_view_t s)
 					current_group_name += TSL('.');
 					std::size_t n{1};
 					std::size_t const original_len{std::size(current_group_name)};
-					while(has_group((current_group_name += std::to_wstring(n))))
+					while(has_group((current_group_name += lSDK::string_t_from_numeric(n))))
 					{
 						++n;
 						current_group_name.resize(original_len);
@@ -476,7 +482,7 @@ void Data::load(lSDK::string_view_t s)
 					item_name_unescaped += TSL('.');
 					std::size_t n{1};
 					std::size_t const original_len{std::size(item_name_unescaped)};
-					while(has_item(current_group_name, (item_name_unescaped += std::to_wstring(n))))
+					while(has_item(current_group_name, (item_name_unescaped += lSDK::string_t_from_numeric(n))))
 					{
 						++n;
 						item_name_unescaped.resize(original_len);
@@ -504,9 +510,14 @@ void Data::load(RunData const* const run_data, std::filesystem::path const& file
 		{
 			ifs.close();
 			toggle_encryption(ini_data, *settings.encrypt_key);
+#ifdef FUSION_ANDROID_RUNTIME
+			// decrypted Ini++ files are UTF-8 on Android (see lSDK/UnicodeUtilities.cpp)
+			return load(lSDK::string_view_t{ini_data});
+#else
 			auto const ini_unicode{lSDK::wide_from_narrow(ini_data)};
 			ini_data.clear();
 			return load(lSDK::string_view_t{ini_unicode});
+#endif
 		}
 		else assert(false);
 		else assert(false);
@@ -514,7 +525,11 @@ void Data::load(RunData const* const run_data, std::filesystem::path const& file
 		else assert(false);
 		else assert(false);
 	}
+#ifdef FUSION_ANDROID_RUNTIME
+	else if(auto const ini_unicode{load_text_file(run_data, file_path.string().c_str())})
+#else
 	else if(auto const ini_unicode{load_text_file(run_data, file_path.wstring().c_str())})
+#endif
 	{
 		return load(lSDK::string_view_t{ini_unicode.get()});
 	}
@@ -655,7 +670,11 @@ void Data::save(RunData const* const run_data, std::filesystem::path const& file
 	}
 	else
 	{
+#ifdef FUSION_ANDROID_RUNTIME
+		std::ignore = save_text_file(run_data, file_path.string().c_str(), stringify().c_str());
+#else
 		std::ignore = save_text_file(run_data, file_path.wstring().c_str(), stringify().c_str());
+#endif
 	}
 }
 

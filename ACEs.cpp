@@ -531,7 +531,7 @@ struct SaveObjectDoer final
 		{
 			prefix += TSL('0');
 		}
-		prefix += std::to_wstring(i);
+		prefix += lSDK::string_t_from_numeric(i);
 		return prefix;
 	}
 	template<bool Const, typename T>
@@ -721,14 +721,14 @@ struct SaveObjectDoer final
 	{
 		if(save_pos_)
 		{
-			make_relevant(o.posx, n.posx, TSL("posx"sv), std::to_wstring(obj.roHo.hoX));
-			make_relevant(o.posy, n.posy, TSL("posy"sv), std::to_wstring(obj.roHo.hoY));
+			make_relevant(o.posx, n.posx, TSL("posx"sv), lSDK::string_t_from_numeric(obj.roHo.hoX));
+			make_relevant(o.posy, n.posy, TSL("posy"sv), lSDK::string_t_from_numeric(obj.roHo.hoY));
 			if((obj.roHo.hoOEFlags & OEFLAG_MOVEMENTS) != 0)
 			{
-				make_relevant(o.dir, n.dir, TSL("dir"sv), std::to_wstring(obj.roc.rcDir));
-				make_relevant(o.spd, n.spd, TSL("spd"sv), std::to_wstring(obj.roc.rcSpeed));
-				make_relevant(o.ani, n.ani, TSL("ani"sv), std::to_wstring(obj.roc.rcAnim));
-				make_relevant(o.frame, n.frame, TSL("frame"sv), std::to_wstring(obj.roc.rcImage));
+				make_relevant(o.dir, n.dir, TSL("dir"sv), lSDK::string_t_from_numeric(obj.roc.rcDir));
+				make_relevant(o.spd, n.spd, TSL("spd"sv), lSDK::string_t_from_numeric(obj.roc.rcSpeed));
+				make_relevant(o.ani, n.ani, TSL("ani"sv), lSDK::string_t_from_numeric(obj.roc.rcAnim));
+				make_relevant(o.frame, n.frame, TSL("frame"sv), lSDK::string_t_from_numeric(obj.roc.rcImage));
 			}
 		}
 		if(save_vals_)
@@ -736,7 +736,7 @@ struct SaveObjectDoer final
 			auto const [values, strings, flags]{get_alterables<true>(obj)};
 			if(!std::empty(flags))
 			{
-				make_relevant(o.flags, n.flags, TSL("flags"sv), std::to_wstring(flags.front()));
+				make_relevant(o.flags, n.flags, TSL("flags"sv), lSDK::string_t_from_numeric(flags.front()));
 			}
 			if(!std::empty(values))
 			{
@@ -752,7 +752,7 @@ struct SaveObjectDoer final
 					}
 					else if(values[i].m_type == TYPE_INT)
 					{
-						make_relevant(ov, nv, name, std::to_wstring(values[i].m_long));
+						make_relevant(ov, nv, name, lSDK::string_t_from_numeric(values[i].m_long));
 					}
 					else if(values[i].m_type == TYPE_FLOAT)
 					{
@@ -1023,7 +1023,7 @@ auto FUSION_API actionSetCurrentGroup(RunData* const run_data, ac_param_t const 
 		run_data->settings->current_group.reserve(std::size(group) + 2);
 		run_data->settings->current_group += TSL('.');
 		std::size_t n{1};
-		while(data.has_group((run_data->settings->current_group += std::to_wstring(n))))
+		while(data.has_group((run_data->settings->current_group += lSDK::string_t_from_numeric(n))))
 		{
 			++n;
 			run_data->settings->current_group.resize(std::size(group) + 1);
@@ -1054,7 +1054,7 @@ auto FUSION_API actionSetValue(RunData* const run_data, ac_param_t, ac_param_t) 
 	}
 	else
 	{
-		value = std::to_wstring(CNC_GetIntParameter(run_data));
+		value = lSDK::string_t_from_numeric(CNC_GetIntParameter(run_data));
 	}
 
 	data.do_doer<ValueDoer>(data, string_t{group}, string_t{item}, move(value));
@@ -1168,7 +1168,7 @@ auto FUSION_API actionSavePositionG(RunData* const run_data, ac_param_t const pa
 
 	auto const x{static_cast<std::int16_t>(HIWORD(param1))};
 	auto const y{static_cast<std::int16_t>(LOWORD(param1))};
-	data.do_doer<ValueDoer>(data, run_data->settings->current_group, string_t{item}, std::to_wstring(x) + TSL(","s) + std::to_wstring(y));
+	data.do_doer<ValueDoer>(data, run_data->settings->current_group, string_t{item}, lSDK::string_t_from_numeric(x) + TSL(","s) + lSDK::string_t_from_numeric(y));
 
 	return action_return_t();
 }
@@ -1182,7 +1182,7 @@ auto FUSION_API actionSavePosition(RunData* const run_data, ac_param_t, ac_param
 
 	auto const x{static_cast<std::int16_t>(HIWORD(position))};
 	auto const y{static_cast<std::int16_t>(LOWORD(position))};
-	data.do_doer<ValueDoer>(data, string_t{group}, string_t{item}, std::to_wstring(x) + TSL(","s) + std::to_wstring(y));
+	data.do_doer<ValueDoer>(data, string_t{group}, string_t{item}, lSDK::string_t_from_numeric(x) + TSL(","s) + lSDK::string_t_from_numeric(y));
 
 	return action_return_t();
 }

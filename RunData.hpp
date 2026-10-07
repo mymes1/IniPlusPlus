@@ -471,7 +471,11 @@ struct RunData final
 };
 static_assert(fusion::is_valid_rundata_structure<FUSION_OEFLAGS>());
 
-#ifndef NDEBUG
+#ifdef FUSION_ANDROID_RUNTIME
+// Android: nobody can see a message box, and aborting the app would be worse than skipping the ACE,
+// so log once and carry on. See docs/COMPATIBILITY.md for the list of unimplemented ACEs.
+#define NOT_YET_IMPLEMENTED { static bool shown{false}; if(!shown){ ::ipp_android::log(::std::string{"Ini++ (Android): ACE not implemented: "} + __func__); shown = true; } }
+#elif !defined(NDEBUG)
 #define NOT_YET_IMPLEMENTED { static bool shown{false}; if(!shown){ assert(!__func__); shown = true; } }
 #elif !defined(FUSION_RUNTIME_ONLY)
 #define NOT_YET_IMPLEMENTED { static bool shown{false}; if(!shown){ std::ignore = ::MessageBoxA({}, __func__, "Ini++ Unicode: unimplemented", MB_ICONWARNING|MB_OK); shown = true; } }
