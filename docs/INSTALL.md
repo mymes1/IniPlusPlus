@@ -2,6 +2,19 @@
 
 Two installations, depending on where the app runs. The **object, its ACEs and the MFA are the same** in both cases: an existing `INI++.mfx`-using project needs no event changes, and the Actions/Conditions/Expressions keep their names, order and parameters.
 
+## 0. From a packaged release (recommended)
+
+Download `IniPlusPlus-<version>.zip` (CI artifact `release-bundle`, or built with
+`tools/package_release.sh`) and extract it **completely** - the installer needs the folders next to
+it. Then:
+
+* **Windows:** run `windows\install.bat`. It finds Fusion 2.5 Developer/Standard and MMF2
+  Developer/Standard in the registry and copies both MFXs into place (sections 1 below, if you
+  prefer doing it by hand or the detection fails - e.g. portable installs, where you pass the folder:
+  `windows\install.bat "D:\Fusion 2.5"`).
+* **Android:** copy `android\INI++.zip` into `<Fusion>\Data\Runtime\Android\` (section 2).
+* The archive also contains `docs\` and, when packaged with `--source`, the sources.
+
 | | Windows build | Android build |
 | --- | --- | --- |
 | File to install | `INI++.mfx` (runtime) and `INI++_edittime.mfx` (edittime) | `INI++.zip` (`assets/mmf/<abi>/CRunINI++.so`) |

@@ -27,6 +27,7 @@ This tree is the `unicode` branch, extended with a **Fusion 2.5 Android runtime 
 | `android/fusion/`, `android/runtime/`, `android/jni/` | Android support: Windows-API shim, platform layer + generated ACE tables, and the extension's JNI/ABI entry points with `Android.mk`/`Application.mk`. |
 | `tools/` | `gen_android_aces.py` (generates the ACE tables from `Menus.cpp`), `run_host_tests.sh`, `smoke_build_so.sh`, `build_android.sh`. |
 | `docs/` | Build, install and compatibility documentation. |
+| `packaging/` | `install-windows.bat` (installs both MFXs into a detected Fusion) and the README that goes into the release archive. |
 
 ## Quick start
 
@@ -43,7 +44,15 @@ msbuild INI++15.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBu
 
 # Android .so (needs the NDK and the proprietary Clickteam Android SDK header, see docs/BUILD.md)
 tools/build_android.sh --sdk-dir /path/to/clickteam-android-sdk --out build/android
+
+# the installable release for Fusion 2.5 (Windows MFX + Android package + installer + docs)
+tools/package_release.sh --windows-runtime <runtime.mfx> --windows-edittime <edittime.mfx> \
+                         --android-dir build/android --out build/release --source
 ```
+
+The CI workflow builds all of the above and uploads the same release archive as the
+`release-bundle` artifact (`IniPlusPlus-<version>.zip`); its layout and the installer are described
+in [docs/BUILD.md § 5.2](docs/BUILD.md) and [docs/INSTALL.md](docs/INSTALL.md).
 
 ## History
 

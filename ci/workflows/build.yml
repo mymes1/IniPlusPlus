@@ -183,45 +183,43 @@ jobs:
         # The Fusion 2.5 Android exporter merges ZIP archives from <Fusion>/Data/Runtime/Android/
         # into the runtime project before building; assets/mmf/<abi>/<name>.so is where the runtime
         # looks for native extension objects (see ClickteamLLC/android, docs/index.md section 5).
+        # dist/android-package/ afterwards holds INI++.zip plus the natives, so the release job can
+        # pass it straight to tools/package_release.sh --android-dir.
         run: |
           set -euo pipefail
-          mkdir -p dist/fusion-android-extension/assets/mmf
+          mkdir -p dist/android-package/assets/mmf
           for abi_dir in dist/android/*/; do
             abi="$(basename "$abi_dir")"
-            mkdir -p "dist/fusion-android-extension/assets/mmf/$abi"
-            cp "$abi_dir/CRunINI++.so" "dist/fusion-android-extension/assets/mmf/$abi/CRunINI++.so"
+            mkdir -p "dist/android-package/assets/mmf/$abi"
+            cp "$abi_dir/CRunINI++.so" "dist/android-package/assets/mmf/$abi/CRunINI++.so"
           done
-          (cd dist/fusion-android-extension && zip -r -9 ../INI++.zip .)
-          unzip -l dist/INI++.zip
+          (cd dist/android-package && zip -r -9 -q ../INI++-android.zip assets && mv ../INI++-android.zip INI++.zip)
+          unzip -l dist/android-package/INI++.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-extension
-          path: |
-            dist/INI++.zip
-            dist/android/*/*.so
+          path: dist/android-package
           if-no-files-found: error
 
   package:
-    name: Package release artifacts
+    name: Package the Fusion 2.5 release archive
     needs: [host-tests, windows-extension, android-extension]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # so the archive name can use git describe
       - uses: actions/download-artifact@v4
-      - name: Assemble the extension packages
+      - name: Assemble IniPlusPlus-<version>.zip (Windows MFX + Android package + docs)
         run: |
           set -euo pipefail
-          version="$(git describe --tags --always || true)"
-          root="IniPlusPlus-${version:-dev}"
-          mkdir -p "dist/$root"
-          cp -r windows-mfx/. "dist/$root/windows/"
-          mkdir -p "dist/$root/android"
-          cp -r android-extension/. "dist/$root/android/"
-          cp -r docs "dist/$root/docs"
-          (cd dist && zip -r -9 "$root.zip" "$root")
-          unzip -l "dist/$root.zip"
-          echo "ARTIFACT=dist/$root.zip" >> "$GITHUB_ENV"
+          tools/package_release.sh \
+            --windows-runtime windows-mfx/INI++.mfx \
+            --windows-edittime windows-mfx/INI++_edittime.mfx \
+            --android-dir android-extension \
+            --out dist --source
+          ls -l dist/*.zip
       - uses: actions/upload-artifact@v4
         with:
           name: release-bundle
@@ -234,10 +232,10 @@ jobs:
             echo
             echo "| artifact | contents |"
             echo "| --- | --- |"
+            echo "| \`release-bundle\` | **IniPlusPlus-<version>.zip** - the installable package: \`windows/install.bat\`, both MFX files, \`android/INI++.zip\`, the Android natives, the documentation and the sources |"
             echo "| \`windows-mfx\` | \`INI++.mfx\` (runtime) and \`INI++_edittime.mfx\` (edittime), built with MSVC v143 |"
-            echo "| \`android-extension\` | \`CRunINI++.so\` per ABI and the \`INI++.zip\` Fusion Android extension package |"
+            echo "| \`android-extension\` | \`INI++.zip\` Fusion Android extension package and \`assets/mmf/<abi>/CRunINI++.so\` |"
             echo "| \`android-smoke-build\` | host-built .so used to verify the exported entry points |"
-            echo "| \`release-bundle\` | both of the above plus the documentation |"
             echo
             echo "Installation: docs/INSTALL.md - limitations: docs/COMPATIBILITY.md"
           } >> "$GITHUB_STEP_SUMMARY"

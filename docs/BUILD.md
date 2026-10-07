@@ -152,6 +152,45 @@ INI++.zip
 
 `docs/INSTALL.md` describes installing it and what to check in the resulting APK.
 
+### 5.2 The installable release archive
+
+`tools/package_release.sh` assembles everything a Fusion 2.5 user needs into one archive - the
+Windows MFX pair, the Android natives with their Fusion package, an installer script, the
+documentation and (with `--source`) the sources:
+
+```sh
+tools/package_release.sh \
+    --windows-runtime build/windows/INI++.mfx \
+    --windows-edittime build/windows/INI++_edittime.mfx \
+    --android-dir build/android \
+    --out build/release --source
+```
+
+The result is `build/release/IniPlusPlus-<version>.zip`:
+
+```
+IniPlusPlus-<version>/
+├── README.txt                        what is inside, quick install for both platforms
+├── windows/
+│   ├── install.bat                   detects Fusion 2.5 / MMF2 installs and copies both MFXs
+│   ├── edittime/INI++.mfx            -> <Fusion>\Extensions\Unicode\INI++.mfx
+│   └── runtime/INI++.mfx             -> <Fusion>\Data\Runtime\Unicode\INI++.mfx
+├── android/
+│   ├── INI++.zip                     -> <Fusion>\Data\Runtime\Android\INI++.zip
+│   └── assets/mmf/<abi>/CRunINI++.so the same natives, unpacked
+├── docs/{INSTALL,COMPATIBILITY,BUILD}.md
+└── source/IniPlusPlus-<version>-source.tar.gz     (with --source)
+```
+
+`--android-dir` accepts either the `--out` directory of `tools/build_android.sh`
+(`<abi>/CRunINI++.so`) or a package folder (`assets/mmf/<abi>/CRunINI++.so`, optionally with a
+ready-made `INI++.zip`).
+
+Without the binaries the script stops and lists what is missing; `--allow-missing` only exists for
+layout tests and stamps `MISSING-BINARIES.txt` into the archive. The CI workflow's `package` job
+runs the same script with the MFX from the Windows job and the Android package from the NDK job, and
+uploads the archive as the `release-bundle` artifact - that is the file to hand to users.
+
 ---
 
 ## 6. Host tests (no NDK, no Clickteam SDK, no Fusion)
@@ -179,6 +218,7 @@ These tests prove the logic, the ACE dispatch and the file layer; they cannot pr
 | `error: RuntimeNative.h was not found under ...` | The Clickteam Android extension SDK was not extracted there; see section 2. |
 | `RuntimeNative.h was not found` / `#error` while compiling `IniPlusPlusExtension.cc` | Same as above. `android/tests/mock-sdk/RuntimeNative.h` is only for the host tests and `tools/smoke_build_so.sh`. |
 | CI: "Clickteam Android SDK required" | The `android-extension` job needs the secret/variable from section 2; the `host-tests`, `ace-tables` and `windows-extension` jobs do not. |
+| `package_release.sh` ends with "incomplete package - missing: ..." | The MFX/`.so` paths it was given do not exist. Build them first (sections 4 and 5), or use `--allow-missing` only to check the layout. |
 | `does not export CRunINI++_...` | The toolchain dropped the assembler aliases (they are guarded by `IPPP_ANDROID_NO_MANGLED_SYMBOLS`); build with a recent NDK, or rename the MFX to a valid identifier and rebuild with `-DIPPP_ANDROID_EXT_NAME=...`. |
 | App starts but the object is missing: `*** MISSING EXTENSION: INI++` | The `.so` is not in `assets/mmf/<abi>/` for the device's ABI (or the MFA's extension name differs from the file name). |
 | The extension loads but every ACE does nothing | The ACE tables are stale: run `python3 tools/gen_android_aces.py` and rebuild. |
