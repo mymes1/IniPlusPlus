@@ -76,6 +76,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0   # for the archive version in git describe
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
       - name: Build the runtime and edittime MFX (MSVC v143, Win32)
@@ -114,10 +115,28 @@ jobs:
             if ($exports -notmatch $symbol) { throw "INI++.mfx does not export $symbol" }
             Write-Host "ok: $symbol"
           }
+      - name: Build the Windows-only installer archive (INI++-windows.zip)
+        shell: pwsh
+        # Usable on its own: extract, run install.bat - the same layout as the "windows" folder of
+        # the full release archive (docs/BUILD.md section 5.2).
+        run: |
+          $version = (git describe --tags --always).TrimStart("v")
+          $root = "IniPlusPlus-$version-windows"
+          New-Item -ItemType Directory -Force -Path "$root/edittime", "$root/runtime", "$root/docs" | Out-Null
+          Copy-Item dist/windows/INI++.mfx          "$root/runtime/INI++.mfx"
+          Copy-Item dist/windows/INI++_edittime.mfx "$root/edittime/INI++.mfx"
+          Copy-Item packaging/install-windows.bat   "$root/install.bat"
+          Copy-Item docs/INSTALL.md, docs/COMPATIBILITY.md, docs/BUILD.md "$root/docs/"
+          (Get-Content packaging/README.txt) -replace '@VERSION@', $version -replace '@DATE@', (Get-Date -Format yyyy-MM-dd) |
+            Set-Content "$root/README.txt"
+          Compress-Archive -Path "$root" -DestinationPath "dist/$root.zip" -Force
+          Get-ChildItem "dist/$root.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-mfx
-          path: dist/windows/*.mfx
+          path: |
+            dist/windows/*.mfx
+            dist/IniPlusPlus-*-windows.zip
           if-no-files-found: error
 
   android-extension:
@@ -233,7 +252,7 @@ jobs:
             echo "| artifact | contents |"
             echo "| --- | --- |"
             echo "| \`release-bundle\` | **IniPlusPlus-<version>.zip** - the installable package: \`windows/install.bat\`, both MFX files, \`android/INI++.zip\`, the Android natives, the documentation and the sources |"
-            echo "| \`windows-mfx\` | \`INI++.mfx\` (runtime) and \`INI++_edittime.mfx\` (edittime), built with MSVC v143 |"
+            echo "| \`windows-mfx\` | \`INI++.mfx\` (runtime) and \`INI++_edittime.mfx\` (edittime) built with MSVC v143, plus **IniPlusPlus-<version>-windows.zip** (extract + run \`install.bat\`) |"
             echo "| \`android-extension\` | \`INI++.zip\` Fusion Android extension package and \`assets/mmf/<abi>/CRunINI++.so\` |"
             echo "| \`android-smoke-build\` | host-built .so used to verify the exported entry points |"
             echo

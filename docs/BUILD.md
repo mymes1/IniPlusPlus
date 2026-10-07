@@ -191,6 +191,11 @@ layout tests and stamps `MISSING-BINARIES.txt` into the archive. The CI workflow
 runs the same script with the MFX from the Windows job and the Android package from the NDK job, and
 uploads the archive as the `release-bundle` artifact - that is the file to hand to users.
 
+The CI workflow also uploads a Windows-only archive (`IniPlusPlus-<version>-windows.zip`, artifact
+`windows-mfx`) with the same `windows/` layout, for users who only need the MFX and do not have the
+Clickteam Android SDK, and the Android package on its own (`INI++.zip`, artifact
+`android-extension`).
+
 ---
 
 ## 6. Host tests (no NDK, no Clickteam SDK, no Fusion)
