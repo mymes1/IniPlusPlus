@@ -298,9 +298,13 @@ int main()
 	check(run_expression_float(e, Expression_GetItemValueG, {"Value2"}, {0}) == 99.0f, "Set value (current group): numeric write");
 
 	// ---- ACEs that need another object: the Android API has no object references, so they must do
-	// nothing instead of dereferencing the zeroed block (the object header's OEFLAGS are 0) ----
-	run_action(e, Action_SaveObject, {"NewGroup"}, {1, 0});
+	// nothing at all - in particular they must not write the zeroed placeholder's values ----
+	run_action(e, Action_SaveObject, {"NewGroup"}, {1, 1}); // position + alterable values enabled
 	check(run_expression_float(e, Expression_GroupCount) == 2.0f, "Save object properties: safe no-op on Android");
+	check(run_expression_float(e, Expression_GetItemValue, {"NewGroup", "posx"}, {-1}) == -1.0f,
+	      "Save object properties: does not write the placeholder's (zeroed) values");
+	check(run_expression_float(e, Expression_GetItemValueG, {"Value1"}, {0}) == 1234.0f,
+	      "Save object properties: leaves the existing values alone");
 
 	// ---- save to a file in the app sandbox, wipe, load it back ----
 	auto const ini_path{dir / "saved.ini"};

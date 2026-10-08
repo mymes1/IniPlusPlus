@@ -4,12 +4,13 @@
 # automation whose GitHub App token lacks the "workflows" permission; GitHub does not run files
 # outside .github/workflows/.  To enable it, either
 #
-#     mkdir -p .github/workflows && cp ci/workflows/build.yml .github/workflows/build.yml
-#     git add .github/workflows/build.yml && git commit -m "Add CI workflow" && git push
+#     cp ci/workflows/build.yml .github/workflows/main.yml
+#     git add .github/workflows/main.yml && git commit -m "Update CI workflow" && git push
 #
-# with a token that has the workflows permission, or create the file with the GitHub web UI
+# with a token that has the workflows permission, or create/update the file with the GitHub web UI
 # (Actions -> New workflow -> set up a workflow yourself) and paste this file's contents, with the
-# first line of the YAML ("name: Build") at the top.
+# first line of the YAML ("name: Build") at the top.  tools/sync_workflow.sh does the copy and
+# strips this header block; tools/sync_workflow.sh --check fails if the two files are out of sync.
 name: Build
 
 # Builds, tests and packages Ini++ for both runtimes it supports:

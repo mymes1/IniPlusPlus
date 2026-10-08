@@ -15,7 +15,7 @@ This tree is the `unicode` branch, extended with a **Fusion 2.5 Android runtime 
 | [docs/BUILD.md](docs/BUILD.md) | Toolchain versions, the Clickteam Android SDK dependency, exact build commands (MSBuild / ndk-build), host tests, troubleshooting |
 | [docs/INSTALL.md](docs/INSTALL.md) | Installing and using the extension in Fusion 2.5, on Windows and on Android |
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | How the Android build works, what is verified and how, all platform differences and limitations |
-| [ci/workflows/build.yml](ci/workflows/build.yml) | CI: ACE-table check, host tests (incl. sanitizers), Windows MFX, Android `.so` + `INI++.zip`, packaged artifacts. GitHub only runs workflows under `.github/workflows/`, so copy it there (`mkdir -p .github/workflows && cp ci/workflows/build.yml .github/workflows/build.yml`) - see the file's header |
+| [ci/workflows/build.yml](ci/workflows/build.yml) | Source of CI: `.github/workflows/main.yml` is generated from it by `tools/sync_workflow.sh` (check with `--check`). Jobs: ACE-table check, host tests (incl. sanitizers), Windows MFX + Windows-only zip, Android `.so` + `INI++.zip`, release packaging |
 
 ## Layout
 

@@ -33,7 +33,7 @@ This is why the "current group" variants of ACEs that read different parameters 
 | --- | --- | --- |
 | The shared sources compile for Android | `g++ -std=c++20 -DFUSION_ANDROID_RUNTIME ...` over `Runtime.cpp`/`ACEs.cpp` (also part of `tools/run_host_tests.sh`) | verified locally (GCC 12) |
 | The ACE tables match `Menus.cpp`/`ACEs.cpp` (all 145 ACEs, same ids, same parameter order) | `python3 tools/gen_android_aces.py --check` (CI job `ace-tables`) | verified |
-| Behaviour through the Android entry points: object creation from Windows-format edit data, groups/items, numbers and strings, `Set value (current group)`, `New`, `Load`, `Save as`, autosave via `handleRunObject`, expression returns, conditions | `tools/run_host_tests.sh` - 32 checks driving `CRunINI++_createRunObject/action/condition/expression/handleRunObject` through a mock of the Android runtime, including files written as UTF-16 and as Windows-1252 (CI job `host-tests`) | verified locally (GCC 12) |
+| Behaviour through the Android entry points: object creation from Windows-format edit data, groups/items, numbers and strings, `Set value (current group)`, `New`, `Load`, `Save as`, autosave via `handleRunObject`, expression returns, conditions | `tools/run_host_tests.sh` - 34 checks driving `CRunINI++_createRunObject/action/condition/expression/handleRunObject` through a mock of the Android runtime, including files written as UTF-16 and as Windows-1252 (CI job `host-tests`) | verified locally (GCC 12) |
 | The extension is a loadable shared object exporting the exact entry points the runtime looks up (`CRunINI++_*` and `CRunIniPlusPlus_*`) | `tools/smoke_build_so.sh`: builds the `.so`, checks `nm -D`, then `dlopen`s it and resolves all 16 entry points with `dlsym` | verified locally |
 | The Windows MFX still builds and exports its entry points | CI job `windows-extension` (MSVC v143, `Runtime`/`Edittime` Win32) | requires CI (needs MSVC) |
 | The Android `.so` builds with the NDK against the official `<RuntimeNative.h>` | CI job `android-extension` (`ci/workflows/build.yml`) | requires CI + the Clickteam Android SDK |
@@ -54,7 +54,7 @@ Ini++ (Android): ACE not implemented: <function name>
 
 once per ACE and do nothing. They are still registered, still have their menus and their parameters, so an MFA that uses them keeps loading. The list (`tools/gen_android_aces.py --report`):
 
-**Actions (54):** `Set string (MD5) (current group)`, `Save globals`, `Load globals`, `Rename group (current group)`, `Rename item (current group)`, `Move item to group (current group)`, `Set string (MD5)`, `Save object properties`, `Load object properties`, `Rename group`, `Rename item`, `Move item`, `Move item to group`, `Copy item`, `Delete item (everywhere)`, `Perform search`, `Perform multiple search`, `Clear results`, `Create sub-INI`, `Create sub-INI from object`, `Merge file`, `Merge group file`, `Merge`, `Merge group from object`, `Backup to`, `Set compression`, `Set read only`, `Set case sensitive`, `Set escape characters`, `Never quote strings`, `Set repeat modes`, `Set newline character`, `Set default directory`, `Compress file`, `Decompress file`, `Open dialog`, `Add repeated item`, `Close dialog`, `Refresh dialog`, `Export CSV`, `Import CSV`, `To chart`, `Find sub-groups`, `Enable sub-groups`, `SSS`, `Set item array`, `Load from array`, `Save to array`, `From chart`, `Save chart settings`, `Load chart settings`, `Clear undo stack`, `Add new undo block`, `Set manual mode`.
+**Actions (54):** `Set string (MD5) (current group)`, `Save globals`, `Load globals`, `Rename group (current group)`, `Rename item (current group)`, `Move item to group (current group)`, `Set string (MD5)`, `Save alterable values`, `Load alterable values`, `Rename group`, `Rename item`, `Move item`, `Move item to group`, `Copy item`, `Delete item (everywhere)`, `Perform search`, `Perform multiple search`, `Clear results`, `Create sub-INI`, `Create sub-INI from object`, `Merge file`, `Merge group file`, `Merge`, `Merge group from object`, `Backup to`, `Set compression`, `Set read only`, `Set case sensitive`, `Set escape characters`, `Never quote strings`, `Set repeat modes`, `Set newline character`, `Set default directory`, `Compress file`, `Decompress file`, `Open dialog`, `Add repeated item`, `Close dialog`, `Refresh dialog`, `Export CSV`, `Import CSV`, `To chart`, `Find sub-groups`, `Enable sub-groups`, `SSS`, `Set item array`, `Load from array`, `Save to array`, `From chart`, `Save chart settings`, `Load chart settings`, `Clear undo stack`, `Add new undo block`, `Set manual mode`.
 
 **Conditions (3):** `Compare MD5`, `Compare MD5 (current group)`, `Wildcard match`.
 
@@ -64,7 +64,28 @@ Everything else works: `Set/Get value`, `Set/Get string`, the current-group vari
 
 ### 3.2 Object / alterable-value ACEs
 
-`Save object properties` / `Load object properties` (and the object based `Save`/`Load` actions) need to read and write **other objects' alterable values, strings, position, movement and flags**. The Android native extension API provides no access to other objects, so on Android (a) these ACEs are among the unimplemented ones above and (b) if they were reached, the object reference parameter would be the all-zero block. Nothing is ever dereferenced; the ACEs simply do nothing. This is the closest compatible behaviour available. The serialized object format (`val###`/`str###`/`posx`/`posy`/`dir`/`spd`/`ani`/`frame`/`flags` keys) is unchanged, so INI data written by those ACEs on Windows still *reads* fine on Android through the normal get-value/string expressions.
+The four "Save/Load object properties" actions (menu: `Save object properties`,
+`Load object properties`, with their "in group" variants) read and write **another object's**
+position, movement, alterable values, strings and flags. The Android native extension API provides
+no access to other objects at all, so on Android these four ACEs log
+
+```
+Ini++ (Android): this ACE needs another object, which the Android extension API cannot provide: actionSaveObject
+```
+
+and return without touching the file or the object. They deliberately do **not** fall back to the
+zeroed placeholder's values: that would overwrite existing data (e.g. `posx`/`posy` = 0) with
+garbage. Nothing is ever dereferenced, so the ACEs are safe to leave in the events; they just do
+nothing, which is the closest compatible behaviour available.
+
+To keep a project working on Android, replace them with explicit writes/reads of the values you want
+to persist, e.g. `Set value "posx" = X of Sonic`, `Set value "posy" = Y of Sonic`,
+`Set value "rings" = ...`, and read them back with the normal get-value expressions. The four
+Windows-only helpers `Save/Load alterable values` are already stubs on both platforms (section 3.1).
+
+The serialized key format (`val###`/`str###`/`posx`/`posy`/`dir`/`spd`/`ani`/`frame`/`flags`) is
+unchanged, so files written by the object ACEs on Windows are readable on Android through the
+ordinary get-value/get-string expressions.
 
 ### 3.3 Custom parameters
 

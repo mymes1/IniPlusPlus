@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# Regenerates .github/workflows/build.yml from ci/workflows/build.yml.
+# Regenerates .github/workflows/main.yml from ci/workflows/build.yml.
 #
 # The workflow lives at ci/workflows/build.yml because GitHub only accepts workflow files pushed by
 # a token with the "workflows" permission, which some automation does not have (see the header of
 # ci/workflows/build.yml).  This script keeps the ready-to-commit copy in .github/workflows in sync:
 # it strips the explanatory header and points the messages back at the installed path.
 #
-# Usage:  tools/sync_workflow.sh          # write .github/workflows/build.yml
+# The installed file is .github/workflows/main.yml (not build.yml), which is also what this script
+# writes; changing a file under .github/workflows/ requires a token with the "workflows" permission,
+# so commits touching it may have to be made by hand (see the header of ci/workflows/build.yml).
+#
+# Usage:  tools/sync_workflow.sh          # write .github/workflows/main.yml
 #         tools/sync_workflow.sh --check  # fail if it is out of date
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SRC=ci/workflows/build.yml
-DST=.github/workflows/build.yml
+DST=.github/workflows/main.yml
 
 generated="$(python3 - "$SRC" <<'PY'
 import sys, pathlib

@@ -50,7 +50,7 @@ Without the header the Android build **fails with an explanation** instead of fa
 
 ### CI
 
-The CI workflow (kept at `ci/workflows/build.yml`, see that file's header for why and how to install it as `.github/workflows/build.yml`) takes the header, in its `android-extension` job, from one of:
+The CI workflow is `.github/workflows/main.yml`, generated from `ci/workflows/build.yml` by `tools/sync_workflow.sh` (the split exists because pushing a file under `.github/workflows/` needs a token with the "workflows" permission; see that file's header). Its `android-extension` job takes the proprietary header from one of:
 
 * the repository secret `CLICKTEAM_ANDROID_SDK_B64` - a base64-encoded `.zip` whose root contains `RuntimeNative.h` (and any headers it includes):
 

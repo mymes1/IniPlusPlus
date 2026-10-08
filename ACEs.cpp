@@ -1114,9 +1114,25 @@ auto FUSION_API actionSetStringMD5(RunData* const run_data, ac_param_t, ac_param
 
 	return action_return_t();
 }
+#ifdef FUSION_ANDROID_RUNTIME
+// Object based ACEs ("Save/Load object properties"): they read and write another object's position,
+// movement, alterable values and strings.  The Android extension API hands the extension no access
+// to other objects - the parameter arrives as a zeroed placeholder - so these ACEs log and do
+// nothing rather than writing the placeholder's zeroes into the file.
+// See docs/COMPATIBILITY.md, section 3.2.
+#define IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE \
+	{ \
+		::ipp_android::log(::std::string{"Ini++ (Android): this ACE needs another object, which the Android extension API cannot provide: "} + __func__); \
+		return action_return_t{}; \
+	}
+#else
+#define IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE static_cast<void>(0)
+#endif
+
 auto FUSION_API actionSaveObjectG(RunData* const run_data, ac_param_t, ac_param_t) noexcept
 -> action_return_t
 {
+	IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE;
 	auto const o{reinterpret_cast<RunObject const*>(CNC_GetParameter(run_data))};
 	ac_param_t const flag_pos{CNC_GetIntParameter(run_data)};
 	ac_param_t const flag_alt{CNC_GetIntParameter(run_data)};
@@ -1129,6 +1145,7 @@ auto FUSION_API actionSaveObjectG(RunData* const run_data, ac_param_t, ac_param_
 auto FUSION_API actionSaveObject(RunData* const run_data, ac_param_t, ac_param_t) noexcept
 -> action_return_t
 {
+	IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE;
 	auto const o{reinterpret_cast<RunObject const*>(CNC_GetParameter(run_data))};
 	string_view_t const group{reinterpret_cast<TCHAR const*>(CNC_GetStringParameter(run_data))};
 	ac_param_t const flag_pos{CNC_GetIntParameter(run_data)};
@@ -1142,6 +1159,7 @@ auto FUSION_API actionSaveObject(RunData* const run_data, ac_param_t, ac_param_t
 auto FUSION_API actionLoadObjectG(RunData* const run_data, ac_param_t const param0, ac_param_t) noexcept
 -> action_return_t
 {
+	IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE;
 	auto const o{reinterpret_cast<RunObject*>(param0)};
 	Data const& data{*(run_data->data)};
 
@@ -1152,6 +1170,7 @@ auto FUSION_API actionLoadObjectG(RunData* const run_data, ac_param_t const para
 auto FUSION_API actionLoadObject(RunData* const run_data, ac_param_t const param0, ac_param_t const param1) noexcept
 -> action_return_t
 {
+	IPPP_ANDROID_OBJECT_ACE_UNAVAILABLE;
 	auto const o{reinterpret_cast<RunObject*>(param0)};
 	string_view_t const group{reinterpret_cast<TCHAR const*>(param1)};
 	Data const& data{*(run_data->data)};

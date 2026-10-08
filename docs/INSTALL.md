@@ -63,7 +63,7 @@ Follow Clickteam's Android exporter setup (the extension adds nothing to it). In
    assets/mmf/armeabi-v7a/CRunINI++.so
    assets/mmf/x86_64/CRunINI++.so
    ```
-   If you build the extension yourself, use the layout from `tools/build_android.sh` / the artifacts of the CI workflow (`ci/workflows/build.yml`).
+   If you build the extension yourself, use the layout from `tools/build_android.sh` / the artifacts of the CI workflow (`.github/workflows/main.yml`).
 4. Start Fusion, open the MFA and build an Android application as usual.
 
 ### 2.3 Verify the installation
@@ -90,7 +90,12 @@ Identical to Windows. The Android runtime hands the extension its edit data (the
 ### 2.5 Notes and limits specific to Android
 
 * The ACEs that had no implementation on Windows either (search, merge, MD5, CSV, charts, dialogs, arrays, rename/move, ...) log `Ini++ (Android): ACE not implemented: <name>` once and do nothing instead of showing a message box. The full list is in `docs/COMPATIBILITY.md`.
-* Object/alterable-value based ACEs (`Save object properties`, `Load object properties`) cannot work on Android: the extension API does not expose other objects. They receive all-zero reference data, as documented in `docs/COMPATIBILITY.md`.
+* The four object-based save/load actions (`Save object properties`, `Load object properties` and
+  their "in group" variants) cannot work on Android: the extension API does not expose other
+  objects. On Android they log `Ini++ (Android): this ACE needs another object, ...` and do
+  nothing - they never write bogus values. If your project uses them to persist a player/object
+  state, write the values explicitly instead (`Set value "posx" = X of Sonic`, ...); see
+  `docs/COMPATIBILITY.md` section 3.2.
 * Ini++'s own custom parameters (`Ini++ parameter` in the ACE parameter list) cannot be read through the Android extension API; ACEs that use them see all-zero data. Avoid them in Android projects where the parameter changes behaviour.
 * Encryption (`Encrypt`/`Toggle encryption`) uses the same Thayer cipher as Windows and stays compatible.
 
