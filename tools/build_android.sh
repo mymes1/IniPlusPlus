@@ -94,14 +94,26 @@ fi
 find_sdk_inc() {
 	local dir="$1"
 	local candidate
+	# The layouts seen in the wild: the header alone in a folder, an inc/include subfolder, the
+	# official SDK's android/jni/ (native/base/NativeExtension.h includes ../../android/jni/...),
+	# and NDK project trees (jni/, native/include/, ...).
 	for candidate in "$dir" "$dir/inc" "$dir/Inc" "$dir/include" "$dir/Include" \
-	                 "$dir/android/inc" "$dir/android/Inc" "$dir/android/include" \
-	                 "$dir/sdk/inc" "$dir/sdk/Inc"; do
+	                 "$dir/jni" "$dir/android/jni" "$dir/android/inc" "$dir/android/Inc" \
+	                 "$dir/android/include" "$dir/native/inc" "$dir/native/include" \
+	                 "$dir/native/jni" "$dir/sdk/inc" "$dir/sdk/Inc" "$dir/sdk/include" \
+	                 "$dir/inc/android" "$dir/include/android"; do
 		if [ -f "$candidate/RuntimeNative.h" ]; then
 			printf '%s\n' "$candidate"
 			return 0
 		fi
 	done
+	# Anything else: look for the header, but not in a whole filesystem tree.
+	local found
+	found="$(find "$dir" -maxdepth 6 -name 'RuntimeNative.h' -print -quit 2>/dev/null || true)"
+	if [ -n "$found" ]; then
+		dirname "$found"
+		return 0
+	fi
 	return 1
 }
 
@@ -111,8 +123,9 @@ if [ -n "$SDK_DIR" ]; then
 		cat >&2 <<EOF
 error: RuntimeNative.h was not found under "$SDK_DIR".
 
-Expected it in the SDK directory itself or in one of: inc/, Inc/, include/, Include/,
-android/inc/, android/Inc/, android/include/, sdk/inc/, sdk/Inc/.
+Expected it in the SDK directory itself or in one of: inc/, Inc/, include/, Include/, jni/,
+android/jni/, android/inc/, android/include/, native/include/, sdk/inc/ (or anywhere below
+"$SDK_DIR" within six levels).
 
 RuntimeNative.h is part of the Clickteam Android extension SDK (the download linked from
 https://www.clickteam.com/extensions-sdks); it is proprietary and is therefore not in this
@@ -127,14 +140,17 @@ error: the Clickteam Android extension SDK was not provided, so <RuntimeNative.h
 This header cannot be replaced: it declares the RuntimeFunctions interface the Android runtime
 calls the extension through, and every Android extension is compiled against it.
 
-How to provide it (see docs/BUILD.md for details):
+How to provide it (see docs/BUILD.md, section 2, for the details):
   * download the Android extension SDK from https://www.clickteam.com/extensions-sdks
-    ("Android" section; the same SDK the Android exporter uses) and extract it, then
+    ("Android SDK" tab -> the "Official Android SDK Release" thread; the download needs a free
+    Clickteam account) and extract it, then
       tools/build_android.sh --sdk-dir /path/to/extracted/sdk
     or set IPPP_ANDROID_SDK_DIR=/path/to/extracted/sdk
-  * or, in CI, provide the extracted header through the repository secret
-    CLICKTEAM_ANDROID_SDK_B64 (or a self-hosted runner's IPPP_ANDROID_SDK_DIR) - see
-    ci/workflows/build.yml, job "android-extension".
+    The header sits at <sdk>/android/jni/RuntimeNative.h in that archive; any extraction layout
+    works, this script searches for it.
+  * or, in CI, provide it through the repository secret CLICKTEAM_ANDROID_SDK_B64 (base64 .zip;
+    tools/make_sdk_b64.sh makes it, also see .github/workflows/main.yml) or a self-hosted
+    runner's IPPP_ANDROID_SDK_DIR.
 
 android/tests/mock-sdk/RuntimeNative.h is a stand-in used by the host tests (tools/run_host_tests.sh)
 only; it must not be used for a distributable extension.
