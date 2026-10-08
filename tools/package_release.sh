@@ -172,7 +172,7 @@ if [ "${#MISSING[@]}" -ne 0 ]; then
 		done
 		echo
 		echo "Build them with the instructions in docs/BUILD.md, or run the CI workflow"
-		echo "(ci/workflows/build.yml -> job 'package'), which produces a complete archive."
+		echo "(.github/workflows/main.yml -> job 'package'), which produces a complete archive."
 	} > "$STAGE/MISSING-BINARIES.txt"
 fi
 

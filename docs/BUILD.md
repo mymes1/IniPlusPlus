@@ -82,10 +82,11 @@ enough.  It rejects both stand-ins if they are pointed at by accident.
 
 ### 2.3 Using it in CI (the `CLICKTEAM_ANDROID_SDK_B64` secret)
 
-The workflow is `.github/workflows/main.yml`, generated from `ci/workflows/build.yml` by
-`tools/sync_workflow.sh` (the split exists because pushing a file under `.github/workflows/` needs a
-token with the "workflows" permission; see that file's header).  Its `android-extension` job takes the
-header from one of:
+The workflow is `.github/workflows/main.yml`, a byte-for-byte copy of `ci/workflows/build.yml`
+(`bash tools/sync_workflow.sh` mirrors it, `--check` verifies).  It lives in `ci/` as well because a
+push that changes a file under `.github/workflows/` needs a GitHub token with the "workflows"
+permission, which automation may not have; the two files are never allowed to differ.  Its
+`android-extension` job takes the header from one of:
 
 * the repository secret `CLICKTEAM_ANDROID_SDK_B64` - the base64 of a small `.zip` containing
   `RuntimeNative.h`, or
@@ -320,7 +321,7 @@ bash tools/run_host_tests.sh                 # behaviour tests through the expor
 SANITIZE=1 bash tools/run_host_tests.sh      # the same, with ASan/UBSan
 bash tools/smoke_build_so.sh                 # builds the .so, checks nm -D and dlopen/dlsym
 tools/build_android.sh --check-only          # ACE tables match Menus.cpp/ACEs.cpp (no SDK, no NDK)
-tools/sync_workflow.sh --check                # .github/workflows/build.yml matches ci/workflows/build.yml
+tools/sync_workflow.sh --check                # .github/workflows/main.yml matches ci/workflows/build.yml
 python3 tools/gen_android_aces.py --report   # which ACEs are implemented, which are stubs
 ```
 
