@@ -5,11 +5,10 @@
 #   tools/make_sdk_b64.sh --sdk-dir /path/to/extracted-sdk [--out clickteam-android-sdk.b64] [--print]
 #   tools/make_sdk_b64.sh --zip /path/to/existing.zip      [--out clickteam-android-sdk.b64]
 #
-# The SDK is downloaded from https://www.clickteam.com/extensions-sdks ("Android SDK" tab -> the
-# "Official Android SDK Release" thread on community.clickteam.com; the download needs a free
-# Clickteam account).  Unpack it wherever you like - this script searches for RuntimeNative.h
-# (official layout: <sdk>/android/jni/RuntimeNative.h), checks that it really is the Clickteam
-# header, packs it (plus the headers next to it) into a small zip and prints the base64.
+# Availability note: the current Gradle archive checked for this project lacks RuntimeNative.h;
+# no complete current public native C++ SDK has been verified. Use this helper ONLY after obtaining
+# the authorized, compatible C++/NDK SDK/header from Clickteam. It cannot turn a Gradle-only archive
+# into a native C++ SDK. See docs/BUILD.md, section 2. The header is searched for recursively.
 #
 # The result goes into the repository secret, not into the repository:
 #   gh secret set CLICKTEAM_ANDROID_SDK_B64 --repo <owner>/<repo> < clickteam-android-sdk.b64

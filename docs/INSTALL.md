@@ -1,18 +1,19 @@
 # Installing and using Ini++
 
-Two installations, depending on where the app runs. The **object, its ACEs and the MFA are the same** in both cases: an existing `INI++.mfx`-using project needs no event changes, and the Actions/Conditions/Expressions keep their names, order and parameters.
+Two installation layouts are documented, depending on where the app runs. Windows installation is supported by the MFX artifacts. **Android installation is conditional and is not yet a verified release**: the C++ build is blocked pending a complete compatible Clickteam native SDK/header (see `docs/BUILD.md`, section 2). The intended Android package preserves the object/ACE surface and MFA data; do not treat it as working in an APK until the real `.so` is built and the user's MFA is tested.
 
 ## 0. From a packaged release (recommended)
 
-Download `IniPlusPlus-<version>.zip` (CI artifact `release-bundle`, or built with
-`tools/package_release.sh`) and extract it **completely** - the installer needs the folders next to
-it. Then:
+When CI has produced a complete `release-bundle` (which is **blocked** until the Clickteam Android
+C++ SDK/header is supplied), download `IniPlusPlus-<version>.zip` and extract it **completely** - the
+installer needs the folders next to it. A stand-in/smoke build is not a distributable Android package.
+Then:
 
 * **Windows:** run `windows\install.bat`. It finds Fusion 2.5 Developer/Standard and MMF2
   Developer/Standard in the registry and copies both MFXs into place (sections 1 below, if you
   prefer doing it by hand or the detection fails - e.g. portable installs, where you pass the folder:
   `windows\install.bat "D:\Fusion 2.5"`).
-* **Android:** copy `android\INI++.zip` into `<Fusion>\Data\Runtime\Android\` (section 2).
+* **Android (only after a verified release exists):** copy `android\INI++.zip` into `<Fusion>\Data\Runtime\Android\` (section 2).
 * The archive also contains `docs\` and, when packaged with `--source`, the sources.
 
 | | Windows build | Android build |
@@ -40,6 +41,10 @@ Both files must be named `INI++.mfx`; Fusion matches the edittime and runtime MF
 ---
 
 ## 2. Android (Fusion 2.5 + Android exporter)
+
+> **Not currently verified:** these installation steps apply only after a genuine `INI++.zip` with
+> `.so` files built against a complete compatible Clickteam C++ SDK has been produced. The currently
+> available Gradle package lacks `RuntimeNative.h`; this branch has not exported the Sonic MFA to APK.
 
 ### 2.1 Prepare the exporter
 

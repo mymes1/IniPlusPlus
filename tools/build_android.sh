@@ -5,11 +5,11 @@
 #   tools/build_android.sh [--sdk-dir DIR] [--ndk DIR] [--abis "arm64-v8a armeabi-v7a x86_64"]
 #                          [--out DIR] [--check-only]
 #
-# The one dependency that cannot come from this repository (or from a public download) is the
-# Clickteam Android extension SDK's <RuntimeNative.h>: it is part of the SDK that ships with
-# Fusion 2.5's Android exporter and may not be redistributed.  Point this script at an extracted
-# copy with --sdk-dir / $IPPP_ANDROID_SDK_DIR; see docs/BUILD.md for how to obtain it.  Without it
-# the build stops with an explanation instead of silently using the host-test stand-in.
+# This native C++ ABI requires Clickteam's <RuntimeNative.h>. The current Gradle archive checked
+# for this project does not contain it, and no complete, current public native-C++ SDK has been
+# verified. Do not substitute the repo's mock/shim. Ask Clickteam for a compatible, licensed SDK;
+# if supplied, point to it with --sdk-dir / $IPPP_ANDROID_SDK_DIR. See docs/BUILD.md section 2.
+# Without the real header this build stops with an explanation.
 #
 # On success the .so files are copied to <out>/<abi>/ as both CRunINI++.so (the name the runtime
 # looks for with INI++.mfx) and CRunIniPlusPlus.so (for MFX files renamed to a valid identifier).
@@ -87,9 +87,9 @@ EOF
 fi
 
 # ---------------------------------------------------------------------------------------------
-# The proprietary SDK header.  The extension only needs <RuntimeNative.h> (and whatever it pulls
-# in); the official SDK layout has moved between exporter releases, so every plausible location is
-# probed and the first one that actually contains the header is used.
+# The proprietary SDK header. The extension needs the exact RuntimeNative.h (and its includes).
+# If an authorized compatible SDK is provided, probe common legacy/current layouts; this does not
+# imply that such a complete SDK is presently available.
 # ---------------------------------------------------------------------------------------------
 find_sdk_inc() {
 	local dir="$1"
@@ -127,9 +127,10 @@ Expected it in the SDK directory itself or in one of: inc/, Inc/, include/, Incl
 android/jni/, android/inc/, android/include/, native/include/, sdk/inc/ (or anywhere below
 "$SDK_DIR" within six levels).
 
-RuntimeNative.h is part of the Clickteam Android extension SDK (the download linked from
-https://www.clickteam.com/extensions-sdks); it is proprietary and is therefore not in this
-repository.  See docs/BUILD.md, section "The Clickteam Android SDK".
+The supplied directory has no RuntimeNative.h. The currently available Gradle archive checked for
+this project does not contain the legacy native C++ header; no complete, current public SDK has been
+verified. See docs/BUILD.md, section 2, and ask Clickteam to confirm/provide a compatible, licensed
+C++/NDK extension SDK. Do not use the repository's mock or shim for a distributable extension.
 EOF
 		exit 1
 	fi
@@ -140,17 +141,17 @@ error: the Clickteam Android extension SDK was not provided, so <RuntimeNative.h
 This header cannot be replaced: it declares the RuntimeFunctions interface the Android runtime
 calls the extension through, and every Android extension is compiled against it.
 
-How to provide it (see docs/BUILD.md, section 2, for the details):
-  * download the Android extension SDK from https://www.clickteam.com/extensions-sdks
-    ("Android SDK" tab -> the "Official Android SDK Release" thread; the download needs a free
-    Clickteam account) and extract it, then
-      tools/build_android.sh --sdk-dir /path/to/extracted/sdk
+This is not supplied by Android Studio, Android SDK/NDK platform packages, or Gradle. The current
+Gradle archive checked for this project does not contain the required header, and a compatible,
+complete public Clickteam C++ SDK has not been verified. See docs/BUILD.md, section 2, and ask
+Clickteam support/forum specifically for the licensed native C++/NDK extension SDK compatible with
+your Fusion/Android Exporter build. Do not use a reconstructed/mock header.
+
+If Clickteam provides the compatible SDK, then:
+  * locally, run tools/build_android.sh --sdk-dir /path/to/extracted/sdk
     or set IPPP_ANDROID_SDK_DIR=/path/to/extracted/sdk
-    The header sits at <sdk>/android/jni/RuntimeNative.h in that archive; any extraction layout
-    works, this script searches for it.
-  * or, in CI, provide it through the repository secret CLICKTEAM_ANDROID_SDK_B64 (base64 .zip;
-    tools/make_sdk_b64.sh makes it, also see .github/workflows/main.yml) or a self-hosted
-    runner's IPPP_ANDROID_SDK_DIR.
+  * in CI, use CLICKTEAM_ANDROID_SDK_B64 (tools/make_sdk_b64.sh) or a self-hosted runner's
+    IPPP_ANDROID_SDK_DIR. These only transport a header you already have; they cannot create it.
 
 android/tests/mock-sdk/RuntimeNative.h is a stand-in used by the host tests (tools/run_host_tests.sh)
 only; it must not be used for a distributable extension.

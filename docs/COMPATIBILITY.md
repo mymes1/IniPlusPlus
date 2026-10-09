@@ -1,18 +1,27 @@
 # Ini++ on Android: architecture, compatibility and limitations
 
-This document describes exactly what the Android build offers, what it does differently from the Windows build, and what has and has not been verified. The Windows extension is unchanged.
+This document describes the Android source port, its intended compatibility, and what has and has not been verified. The Windows extension is unchanged.
+
+> **Release status:** the Android native C++ build is currently blocked/unverified. The Gradle package
+> available to the project owner lacks Clickteam's proprietary `RuntimeNative.h`, and a complete
+> current public C++ SDK has not been verified. Host tests and the shim-based smoke build do not prove
+> exporter compatibility. Do not use this as a working Android release until a real `.so` is built
+> against Clickteam's compatible SDK and an MFA is exported/tested; see `docs/BUILD.md`, section 2.
 
 ---
 
 ## 1. Approach
 
-Ini++ is not rewritten and not re-implemented per platform: **the same `Runtime.cpp`, `ACEs.cpp` and `RunData.hpp` are compiled for Android**, with three additions:
+Ini++ is not rewritten and not re-implemented per platform: the design compiles the same `Runtime.cpp`, `ACEs.cpp` and `RunData.hpp` for Android, with three additions. This source-level architecture passes host tests, but the real NDK compile against Clickteam's exporter ABI is still blocked by the missing SDK header (section 2 of `docs/BUILD.md`):
 
 1. **`android/fusion/` - a compile-time shim for the Windows build environment.** The shared sources include `<Windows.h>`, `<Shlobj.h>`, `lSDK.hpp` and the Fusion API headers, and call `mv*`/`CNC_*`/`callRunTimeFunction`. On Android these resolve to `android/fusion/FusionAPI.hpp` (types, constants, struct layouts taken from the Windows SDK headers so the shared code compiles unchanged), `ParamFrame.hpp` (the ACE parameter frame), and small stand-ins for the rest. Platform behaviour is behind `#ifdef FUSION_ANDROID_RUNTIME`; there is no `#ifdef` in any ACE body.
 2. **`android/runtime/AndroidRuntime.cpp` - the Android platform layer:** the application's writable data directory, UTF-8 file I/O with the same BOM/encoding handling as Windows, logging, and `SerializedEditData::deserialize()` with the byte layout the Windows editor writes (v1 ANSI and v2 UTF-16), including the same "unknown version → defaults" behaviour (a log line instead of a message box).
 3. **`android/jni/IniPlusPlusExtension.cc` + `android/runtime/AceDispatch.inc`** - the extension side of the official Android native extension ABI described by the Clickteam Android SDK (`RuntimeFunctions`, `extInit`/`createRunObject`/`getNumberOfConditions`/`destroyRunObject`/`handleRunObject`/`action`/`condition`/`expression`). The dispatch table is **generated from `Menus.cpp`** (`tools/gen_android_aces.py`), so parameter lists, types and their order are the same data the editor and the Windows runtime use, and the generator fails the build if `Menus.cpp`'s ACE lists and `ACEs.cpp`'s tables ever disagree.
 
-Consequences: the ACE surface, the parameter order, the editing experience, the object's identifier (`0x12FD53A0`), its OEFLAGS, its icon and its editor resources are identical to Windows; a project only needs to be built for Android, not edited.
+The intended consequence, once the real ABI build is available and verified, is that the ACE surface,
+parameter order, editing experience, object identifier (`0x12FD53A0`), OEFLAGS, icon and editor
+resources match Windows; the MFA should not need event edits. This compatibility is a source-level
+design goal, not yet validated by a real exporter build.
 
 ### 1.1 Parameter passing
 
@@ -31,12 +40,12 @@ This is why the "current group" variants of ACEs that read different parameters 
 
 | What | How it is verified | Status |
 | --- | --- | --- |
-| The shared sources compile for Android | `g++ -std=c++20 -DFUSION_ANDROID_RUNTIME ...` over `Runtime.cpp`/`ACEs.cpp` (also part of `tools/run_host_tests.sh`) | verified locally (GCC 12) |
+| The shared sources compile in the host-test configuration | `g++ -std=c++20 -DFUSION_ANDROID_RUNTIME ...` over `Runtime.cpp`/`ACEs.cpp` with test platform definitions (also part of `tools/run_host_tests.sh`) | verified locally (GCC 12); **not an NDK/exporter build** |
 | The ACE tables match `Menus.cpp`/`ACEs.cpp` (all 145 ACEs, same ids, same parameter order) | `python3 tools/gen_android_aces.py --check` (CI job `ace-tables`) | verified |
 | Behaviour through the Android entry points: object creation from Windows-format edit data, groups/items, numbers and strings, `Set value (current group)`, `New`, `Load`, `Save as`, autosave via `handleRunObject`, expression returns, conditions | `tools/run_host_tests.sh` - 34 checks driving `CRunINI++_createRunObject/action/condition/expression/handleRunObject` through a mock of the Android runtime, including files written as UTF-16 and as Windows-1252 (CI job `host-tests`) | verified locally (GCC 12) |
 | The extension is a loadable shared object exporting the exact entry points the runtime looks up (`CRunINI++_*` and `CRunIniPlusPlus_*`) | `tools/smoke_build_so.sh`: builds the `.so`, checks `nm -D`, then `dlopen`s it and resolves all 16 entry points with `dlsym` | verified locally |
 | The Windows MFX still builds and exports its entry points | CI job `windows-extension` (MSVC v143, `Runtime`/`Edittime` Win32) | requires CI (needs MSVC) |
-| The Android `.so` builds with the NDK against the official `<RuntimeNative.h>` | CI job `android-extension` (`ci/workflows/build.yml`) | requires CI + the Clickteam Android SDK |
+| The Android `.so` builds with the NDK against the real `<RuntimeNative.h>` | CI job `android-extension` (`ci/workflows/build.yml`) | **blocked/unverified**: the Gradle archive checked for this project lacks the header; no complete current public C++ SDK has been verified (see `docs/BUILD.md`, section 2) |
 | Behaviour on a real device / with the real runtime | Build an APK from an MFA that uses `INI++.mfx` with the exporter and run it | **not yet performed** - see section 4 |
 | Windows behaviour is unaffected by the Android work | All changes to the shared sources are either Android-only (`#ifdef FUSION_ANDROID_RUNTIME`) or platform-neutral (`std::to_wstring` → `lSDK::string_t_from_numeric`, which is `std::to_wstring` on Windows); the Windows files, project file, resources and ACE tables are otherwise untouched | reviewed; Windows build runs in CI |
 

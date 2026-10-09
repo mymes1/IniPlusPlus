@@ -30,154 +30,112 @@ The Android build compiles **four** translations units: `Runtime.cpp`, `ACEs.cpp
 
 ---
 
-## 2. The one proprietary dependency: the Clickteam Android extension SDK
+## 2. Android native C++ SDK: current availability is unresolved
 
-The Android runtime calls extensions through a C structure called `RuntimeFunctions`, declared in the
-SDK header `<RuntimeNative.h>`.  That header is part of the Clickteam Android extension SDK, which is
-licensed and **cannot be redistributed** with this repository - the repository therefore ships no
-copy of it:
+The Android implementation in this branch uses Clickteam's **legacy native C/C++ extension ABI**.
+It needs the exact Clickteam runtime header `RuntimeNative.h` (and any headers it includes); this is
+not a file supplied by Android Studio, the Android SDK/NDK, or Gradle. It cannot safely be recreated
+from the mock or shim in this repository.
 
-| File | What it is | May it be used for a release build? |
-| --- | --- | --- |
-| `android/tests/mock-sdk/RuntimeNative.h` | host-test stand-in used by `tools/run_host_tests.sh` | **no** (the build scripts reject it) |
-| `android/sdk-shim/RuntimeNative.h` | documented reconstruction, for reading the code | **no** (the build scripts reject it) |
-| your extracted Clickteam SDK | the real header | yes |
+### 2.1 Does a usable C++ SDK exist?
 
-Without the real header the Android build **fails with an explanation** instead of silently using a
-stand-in.
+**Historically, yes; a current, complete, supported public package is not verified.** The Clickteam
+SDK webpage still says Android extensions can be written in C++ or Java and links to its “Official
+Android SDK Release” forum thread. The public Clickteam repository is explicitly *Android SDK v1* for
+exporter beta 33-era releases; it includes an NDK C/C++ template, but its
+`native/base/NativeExtension.h` includes `../../android/jni/RuntimeNative.h`, which is not present in
+the public repository. That repository was last changed in 2012. A community-maintained SDK list also
+labels the Android SDK “No public SDK available.”
 
-### 2.1 Where to get it
+As of 2026-10-09, the only package the project owner could access on the download page was the
+**Gradle** package; the extracted archive reported for this build does not contain `RuntimeNative.h`.
+Fusion's Gradle-based exporter/package and the old C++ NDK extension ABI are related to Android
+export but are **not interchangeable interfaces**. The official webpage's
+C++/Java description does not prove that the currently linked Gradle archive includes the legacy
+C++ header or that the old NDK template is supported by today's exporter.
 
-1. Open <https://www.clickteam.com/extensions-sdks> and switch to the **Android SDK** tab.
-2. Follow its **\[Download Android SDK\]** link - it points at the *Official Android SDK Release*
-   thread on <http://community.clickteam.com/threads/89105-Official-Android-SDK-Release>.  The forum
-   needs a **free Clickteam account** (log in or register, then download the attachment).
-3. Extract the archive anywhere.  The relevant part is the header, which sits at
-   `<sdk>/android/jni/RuntimeNative.h` in the official layout (the SDK's own
-   `native/base/NativeExtension.h` includes `../../android/jni/RuntimeNative.h`); the archive also
-   contains the `CRunTemplate` NDK project, `tools/install-native` and the `runtime/` directory that
-   Clickteam's docs tell you to fill from `<Fusion>/Data/Runtime/Android/RuntimeAndroid.zip`.
+**So this is a real external blocker.** Until Clickteam confirms/provides a complete, licensed native
+C++ SDK compatible with the user's Fusion/Android Exporter build, `tools/build_android.sh` must fail
+rather than compile against `android/sdk-shim/RuntimeNative.h` or the host-test mock. We have not
+verified an Android `.so` built against the user's exporter, nor exported the Sonic MFA to an APK.
 
-Worth checking before you download: some Android exporter installations already carry a copy of the
-SDK next to Fusion.  Search your Fusion folder for `RuntimeNative.h`
-(`dir /s /b RuntimeNative.h` in `C:\Program Files (x86)\Clickteam Fusion 2.5`, or drag the folder
-into Explorer's search box); if a copy shows up it is the same header and can be used as is.
+The official page and old sources to ask Clickteam about:
 
-The header is only needed to *compile*.  It is never shipped: `INI++.zip` contains only the compiled
-`CRunINI++.so` files, and nothing in this repository redistributes the SDK.  Do not commit the header,
-publish it in a gist, or add it to a release archive.
+- <https://www.clickteam.com/extensions-sdks> — Android SDK tab; it links to the old release thread.
+- <https://community.clickteam.com/threads/89105-Official-Android-SDK-Release> — the linked release
+  thread. Forum access may be restricted; a free account alone is **not confirmed** to grant access.
+- <https://github.com/ClickteamLLC/android> — historical public Android SDK v1 (not a complete,
+  verified current C++ SDK).
+- <https://service.clickteam.com/> — Clickteam support request.
 
-### 2.2 Using it locally (no CI)
+Ask specifically: “Is there a **complete, supported C++/NDK Android extension SDK for my Fusion 2.5
+and Android Exporter build**, compatible with its Gradle exporter? The Android SDK archive currently
+available to me is the Gradle package and does not contain `android/jni/RuntimeNative.h`. The public
+`ClickteamLLC/android` template includes `NativeExtension.h` which references that missing header.
+If C++ extensions are still supported, where can I obtain the authorized header/template and which
+exporter builds/ABIs does it support? If not, is the Java/Gradle extension interface the supported
+route?”
+
+Do **not** assume `<Fusion>/Data/Runtime/Android/RuntimeAndroid.zip` supplies this header: Clickteam's
+old SDK docs identify that archive as the Android runtime source to populate the runtime project,
+not as a confirmed source for the native-extension header.
+
+### 2.2 If Clickteam provides a compatible, authorized C++ SDK
+
+Only then, use the real header locally:
 
 ```sh
-tools/build_android.sh --sdk-dir /path/to/extracted/sdk
+tools/build_android.sh --sdk-dir /path/to/extracted/native-cpp-sdk
 # or
-export IPPP_ANDROID_SDK_DIR=/path/to/extracted/sdk
+export IPPP_ANDROID_SDK_DIR=/path/to/extracted/native-cpp-sdk
 ```
 
-`tools/build_android.sh` looks in the directory itself and in the layouts seen in the wild
-(`inc/`, `include/`, `jni/`, `android/jni/`, `android/inc/`, `native/include/`, `sdk/inc/`, ...) and
-as a last resort searches up to six levels below `--sdk-dir`, so pointing it at the SDK root is
-enough.  It rejects both stand-ins if they are pointed at by accident.
+The build script probes common include layouts, including `jni/`, `android/jni/` and
+`native/include/`, then searches up to six levels below the given SDK directory. It rejects both
+repository stand-ins. The script's header discovery is a convenience; it does **not** make an
+incompatible SDK/API work.
 
-### 2.3 Using it in CI (the `CLICKTEAM_ANDROID_SDK_B64` secret)
+### 2.3 CI and base64 (only after obtaining that header)
 
 The workflow is `.github/workflows/main.yml`, a byte-for-byte copy of `ci/workflows/build.yml`
-(`bash tools/sync_workflow.sh` mirrors it, `--check` verifies).  It lives in `ci/` as well because a
-push that changes a file under `.github/workflows/` needs a GitHub token with the "workflows"
-permission, which automation may not have; the two files are never allowed to differ.  Its
-`android-extension` job takes the header from one of:
+(`bash tools/sync_workflow.sh` mirrors it; `--check` verifies). If Clickteam supplies a compatible
+header, the `android-extension` job can receive it through either:
 
-* the repository secret `CLICKTEAM_ANDROID_SDK_B64` - the base64 of a small `.zip` containing
+* repository secret `CLICKTEAM_ANDROID_SDK_B64` — base64 of a small `.zip` containing the real
   `RuntimeNative.h`, or
-* the repository variable `IPPP_ANDROID_SDK_DIR` (a path that exists on a self-hosted runner).
+* self-hosted runner variable `IPPP_ANDROID_SDK_DIR` — a path to the authorized extracted SDK.
 
-If neither is configured the job fails and prints how to provide the SDK.  That is intentional: the
-alternative would be a silently broken or non-redistributable Android extension.
-
-#### Making the base64 string
+These are **transport mechanisms only**; they cannot supply or reconstruct an absent header. The
+job is intentionally a hard failure if no header is provided.
 
 ```sh
-# Linux / macOS / WSL / Git Bash - the helper checks the header, packs it and writes the .b64 file
-tools/make_sdk_b64.sh --sdk-dir /path/to/extracted/sdk --out clickteam-android-sdk.b64
-tools/make_sdk_b64.sh --zip /path/to/clickteam-android-sdk.zip --out clickteam-android-sdk.b64
+# POSIX (Linux / macOS / WSL / Git Bash), after receiving the compatible SDK:
+tools/make_sdk_b64.sh --sdk-dir /path/to/extracted/native-cpp-sdk --out clickteam-android-sdk.b64
+# or from an authorized SDK zip that actually contains RuntimeNative.h:
+tools/make_sdk_b64.sh --zip /path/to/native-cpp-sdk.zip --out clickteam-android-sdk.b64
 ```
 
 ```powershell
-# Windows (PowerShell) - same helper, Windows version
-powershell -ExecutionPolicy Bypass -File tools\make_sdk_b64.ps1 -SdkDir C:\sdk\clickteam-android
+# Windows PowerShell, after receiving the compatible SDK:
+powershell -ExecutionPolicy Bypass -File tools\make_sdk_b64.ps1 -SdkDir C:\sdk\clickteam-native-cpp
 ```
 
-By hand, if you prefer:
+The helper refuses the test mock and shim, packs the header with adjacent headers only, and writes a
+single-line base64 file. It cannot make the Gradle archive usable if the archive lacks the header.
+Never commit or redistribute Clickteam's proprietary SDK files. Keep the resulting secret under
+GitHub's 48 kB repository-secret limit.
 
-```sh
-# Linux (GNU coreutils)
-cd /path/to/extracted/sdk && zip -r ../clickteam-android-sdk.zip android/jni
-base64 -w0 ../clickteam-android-sdk.zip > clickteam-android-sdk.b64
-
-# macOS (BSD base64: -b 0 = no line breaks)
-cd /path/to/extracted/sdk && zip -r ../clickteam-android-sdk.zip android/jni
-base64 -b 0 ../clickteam-android-sdk.zip > clickteam-android-sdk.b64
-
-# any OS with python3 instead of a zip tool
-python3 -c "import base64,pathlib;d=pathlib.Path('android/jni');z=pathlib.Path('clickteam-android-sdk.zip');import zipfile;f=zipfile.ZipFile(z,'w',zipfile.ZIP_DEFLATED);[f.write(p,p.as_posix()) for p in d.rglob('*.h')];f.close();pathlib.Path('clickteam-android-sdk.b64').write_text(base64.b64encode(z.read_bytes()).decode())"
-```
-
-```powershell
-# Windows without the helper: zip the header's folder, then base64 it into a file
-Compress-Archive -Path C:\sdk\clickteam-android\android -DestinationPath .\clickteam-android-sdk.zip -Force
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('.\clickteam-android-sdk.zip')) |
-  Set-Content -NoNewline .\clickteam-android-sdk.b64
-```
-
-The zip structure is not checked in any way that matters - the workflow extracts it and searches for
-`RuntimeNative.h`.  All of these work:
-
-```
-clickteam-android-sdk.zip
-├── RuntimeNative.h                     <- header alone at the root (smallest)
-├── inc/RuntimeNative.h                 <- header in a subfolder
-└── android/jni/RuntimeNative.h         <- as shipped by Clickteam (plus the headers next to it,
-                                            in case RuntimeNative.h includes them)
-```
-
-Keep the archive small: it holds **headers only, never the whole SDK** with its binaries, templates
-and runtime sources.  GitHub rejects repository secrets larger than 48 kB, so a base64 string much
-above ~48,000 characters will not save.  If it does not fit, put just `RuntimeNative.h` in the zip;
-if the compiler then complains about a missing include, add that header too.
-
-#### Setting the secret
+Set the secret with:
 
 ```sh
 gh secret set CLICKTEAM_ANDROID_SDK_B64 --repo mymes1/IniPlusPlus < clickteam-android-sdk.b64
 ```
 
-or in the browser: *Settings -> Secrets and variables -> Actions -> New repository secret*, name
-`CLICKTEAM_ANDROID_SDK_B64`, paste the file's contents (it is a single long line).
-
-For a self-hosted runner, *Settings -> Secrets and variables -> Actions -> **Variables** -> New
-repository variable*, name `IPPP_ANDROID_SDK_DIR`, value e.g. `C:\sdk\clickteam-android`.
-
-#### Verifying it worked
-
-Re-run the *Build* workflow.  The `android-extension` job's first step prints the header it found:
-
-```
-Extracted the Clickteam Android SDK header archive:
-/opt/hostedtoolcache/.../clickteam-android-sdk/android/jni/RuntimeNative.h
-```
-
-and `tools/build_android.sh` then prints `Android SDK include directory: ...` before invoking
-`ndk-build`.  If you still see `::error title=Clickteam Android SDK required`, the secret/var was not
-visible to the job (wrong repository, wrong name, or the workflow file on the default branch does not
-contain the step yet).
-
-### CI - what the Android job does with it
-
-The `android-extension` job checks out the repository, installs the NDK version from section 3,
-materialises the header from the secret/variable, runs `tools/build_android.sh` for the three ABIs and
-packages `dist/android-package/` (`INI++.zip` + `assets/mmf/<abi>/CRunINI++.so`) for the `package`
-job.
+or in GitHub: *Settings -> Secrets and variables -> Actions -> New repository secret*, name
+`CLICKTEAM_ANDROID_SDK_B64`. A self-hosted runner can instead set `IPPP_ANDROID_SDK_DIR` to the
+licensed SDK directory. If Clickteam confirms there is no compatible C++ SDK, this branch's current
+native `.so` implementation must be revisited (likely against the supported Java/Gradle extension
+API); do not treat a smoke build with the shim as exporter compatibility.
 
 ---
 
@@ -303,14 +261,15 @@ IniPlusPlus-<version>/
 ready-made `INI++.zip`).
 
 Without the binaries the script stops and lists what is missing; `--allow-missing` only exists for
-layout tests and stamps `MISSING-BINARIES.txt` into the archive. The CI workflow's `package` job
-runs the same script with the MFX from the Windows job and the Android package from the NDK job, and
-uploads the archive as the `release-bundle` artifact - that is the file to hand to users.
+layout tests and stamps `MISSING-BINARIES.txt` into the archive. The CI workflow's `package` job runs the same script with the MFX from the Windows job and the
+Android package from the NDK job, and uploads the archive as `release-bundle` **only if both builds
+succeed**. Since the current Clickteam C++ header is unavailable, that complete package is currently
+blocked; do not use a stand-in/smoke archive as a release.
 
-The CI workflow also uploads a Windows-only archive (`IniPlusPlus-<version>-windows.zip`, artifact
-`windows-mfx`) with the same `windows/` layout, for users who only need the MFX and do not have the
-Clickteam Android SDK, and the Android package on its own (`INI++.zip`, artifact
-`android-extension`).
+When the respective build jobs succeed, CI also uploads a Windows-only archive
+(`IniPlusPlus-<version>-windows.zip`, artifact `windows-mfx`) with the same `windows/` layout, and
+the Android package on its own (`INI++.zip`, artifact `android-extension`). The Windows-only artifact
+does not depend on the Android C++ SDK.
 
 ---
 
@@ -336,11 +295,12 @@ These tests prove the logic, the ACE dispatch and the file layer; they cannot pr
 | Symptom | Cause / fix |
 | --- | --- |
 | `error: ndk-build was not found` | Install the NDK (r23+) and put `ndk-build` on `PATH`, or pass `--ndk`/`ANDROID_NDK_HOME`. |
-| `error: RuntimeNative.h was not found under ...` | The Clickteam Android extension SDK was not extracted there; see section 2. |
-| `RuntimeNative.h was not found` / `#error` while compiling `IniPlusPlusExtension.cc` | Same as above. `android/tests/mock-sdk/RuntimeNative.h` is only for the host tests and `tools/smoke_build_so.sh`. |
-| CI: "Clickteam Android SDK required" | The `android-extension` job needs the secret/variable from section 2; the `host-tests`, `ace-tables` and `windows-extension` jobs do not. |
-| `build_android.sh`: "RuntimeNative.h was not found under ..." | `--sdk-dir` points at something that is not the extracted SDK (or the download was the wrong tab of the SDK page). The header is at `<sdk>/android/jni/RuntimeNative.h` in the official archive; the script searches that layout too, so pointing at the SDK root works. |
-| `make_sdk_b64.sh`: "this is ... the host-test stand-in" | You pointed it at `android/tests/mock-sdk/` or `android/sdk-shim/` instead of the extracted Clickteam SDK. |
+| `error: RuntimeNative.h was not found under ...` | The supplied archive may be the Gradle package, which lacks the required legacy native C++ header. See section 2; ask Clickteam whether a supported complete C++ SDK is available. |
+| `RuntimeNative.h was not found` / `#error` while compiling `IniPlusPlusExtension.cc` | Same as above. `android/tests/mock-sdk/RuntimeNative.h` and `android/sdk-shim/RuntimeNative.h` are not release headers. |
+| CI: "Clickteam native C++ SDK header unavailable" | No compatible header was provided. The host tests, ACE tables and Windows MFX are independent; the Android and complete-release jobs are blocked until Clickteam supplies a compatible SDK. |
+| `build_android.sh`: "RuntimeNative.h was not found under ..." | The supplied archive may be the Gradle package, not a complete native C++ SDK. This project has not verified a current public SDK containing the header; see section 2 and ask Clickteam for the compatible licensed package. |
+| `make_sdk_b64.sh`: no `RuntimeNative.h` | The selected archive does not contain the required C++ runtime header. Base64 cannot add it; see section 2. |
+| `make_sdk_b64.sh`: "this is ... the host-test stand-in" | You pointed it at `android/tests/mock-sdk/` or `android/sdk-shim/` instead of a compatible, authorized native C++ SDK. |
 | Secret will not save: too large / "must be less than 48 KB" | Pack headers only - `tools/make_sdk_b64.sh` does that by default; if the header's own directory is still too big, zip `RuntimeNative.h` alone. |
 | `package_release.sh` ends with "incomplete package - missing: ..." | The MFX/`.so` paths it was given do not exist. Build them first (sections 4 and 5), or use `--allow-missing` only to check the layout. |
 | `does not export CRunINI++_...` | The toolchain dropped the assembler aliases (they are guarded by `IPPP_ANDROID_NO_MANGLED_SYMBOLS`); build with a recent NDK, or rename the MFX to a valid identifier and rebuild with `-DIPPP_ANDROID_EXT_NAME=...`. |

@@ -1,6 +1,14 @@
 Ini++ (Unicode) @VERSION@
-Fusion 2.5 / Multimedia Fusion 2 (Unicode) extension, Windows + Android runtime
+Fusion 2.5 / Multimedia Fusion 2 (Unicode) extension package
 Packaged @DATE@
+
+Android status
+--------------
+The Android runtime source in this project is not yet a verified Android release. The current
+Gradle SDK package available to the project owner lacks Clickteam's proprietary RuntimeNative.h,
+which is required to build the legacy native C++ extension. This archive's Android files must only
+be treated as distributable if they were built against a complete, licensed Clickteam SDK; a mock
+or shim-based smoke .so is not acceptable. See docs/BUILD.md, section 2, and docs/COMPATIBILITY.md.
 
 What is in this archive
 -----------------------
@@ -30,10 +38,11 @@ Quick install - Windows
   3. Restart Fusion. The object appears as "Ini++" (Unicode); existing projects that use it need no
      changes.
 
-Quick install - Android
------------------------
-  1. Copy android\INI++.zip into <Fusion>\Data\Runtime\Android\ (the Android exporter merges it
-     into the runtime project when building an APK).
+Quick install - Android (only for a verified release)
+------------------------------------------------------
+  1. Only proceed if this archive contains real INI++.so files built against the compatible,
+     licensed Clickteam native C++ SDK; do not install a mock/shim build. Copy android\INI++.zip into
+     <Fusion>\Data\Runtime\Android\ (the Android exporter merges it into the runtime project).
   2. Build the application for Android as usual. The Android exporter needs JDK 11, Android SDK
      Platform API 34 / Build-Tools 34.x, the NDK and Gradle - see docs\INSTALL.md, section 2.
   3. To verify: unzip the built APK and look for
@@ -41,8 +50,8 @@ Quick install - Android
 
 Notes
 -----
-  * Windows and Android share the same object, ACEs, properties and INI file format - a project
-    built for Android does not need any event changes.
+  * The intended Android port preserves the Windows object, ACEs, properties and INI file format.
+    Compatibility with a real exporter/runtime and an unmodified MFA is not verified yet.
   * The Actions/Conditions/Expressions that are unimplemented in this fork (search, merge, MD5,
     CSV, charts, dialogs, ...) do nothing and log once on Android; on Windows they show an
     "unimplemented" message box. The full list is in docs\COMPATIBILITY.md.
