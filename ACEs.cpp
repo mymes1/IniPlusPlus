@@ -554,43 +554,43 @@ struct SaveObjectDoer final
 			{
 				auto& rov{*static_cast<mc<Const, rVal20a>*>(rov_ptr)};
 				assert(false); //not easy to support values in this version like this
-				ret.strings = {reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = {reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
 				auto& rov{*static_cast<mc<Const, rVal20b>*>(rov_ptr)};
-				ret.values = {rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
-				ret.strings = {reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = {reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.values = decltype(ret.values){rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
+				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
 				auto& rov{*static_cast<mc<Const, rVal25>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
-					ret.values = {rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
+					ret.values = decltype(ret.values){rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
 				}
-				ret.strings = {reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = {reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
 			}
 			else
 			{
 				auto& rov{*static_cast<mc<Const, rVal25P>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
-					ret.values = {rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
+					ret.values = decltype(ret.values){rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
 				}
 				if(rov.rvNumberOfStrings >= 0)
 				{
-					ret.strings = {reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
+					ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				ret.flags = {reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
 			}
 		}
 		return ret;
 	}
-	static auto resize_values(RunObject& obj, std::size_t new_size) noexcept
+	static std::span<CValue> resize_values(RunObject& obj, std::size_t new_size) noexcept
 	{
 		static constexpr std::size_t const max_size{std::numeric_limits<std::int32_t>::max()/sizeof(CValue)};
 		if(new_size > max_size)
@@ -614,7 +614,7 @@ struct SaveObjectDoer final
 			{
 				auto& rov{*static_cast<rVal20b*>(rov_ptr)};
 				std::ignore = new_size;//can't resize
-				values = {rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
+				values = std::span<CValue>{rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
 			}
 			else
 			{
@@ -634,14 +634,14 @@ struct SaveObjectDoer final
 				}
 				if((*rvNumberOfValues >= 0 && static_cast<std::size_t>(*rvNumberOfValues) >= new_size))
 				{
-					values = {*rvpValues, static_cast<std::size_t>(*rvNumberOfValues)};
+					values = std::span<CValue>{*rvpValues, static_cast<std::size_t>(*rvNumberOfValues)};
 				}
 				else if(auto const new_values{mvReAlloc(mV, *rvpValues, new_size*sizeof(CValue))})
 				{
 					*rvpValues = static_cast<CValue*>(new_values);
 					auto const old_size{*rvNumberOfValues};
 					*rvNumberOfValues = new_size;
-					values = {*rvpValues, new_size};
+					values = std::span<CValue>{*rvpValues, new_size};
 					for(auto i{old_size}; i < *rvNumberOfValues; ++i)
 					{
 						values[i].m_type = TYPE_INT;
@@ -650,13 +650,13 @@ struct SaveObjectDoer final
 				}
 				else if(*rvNumberOfValues >= 0)
 				{
-					values = {*rvpValues, static_cast<std::size_t>(*rvNumberOfValues)};
+					values = std::span<CValue>{*rvpValues, static_cast<std::size_t>(*rvNumberOfValues)};
 				}
 			}
 		}
 		return values;
 	}
-	static auto resize_strings(RunObject& obj, std::size_t new_size) noexcept
+	static std::span<void*> resize_strings(RunObject& obj, std::size_t new_size) noexcept
 	{
 		static constexpr std::size_t const max_size{std::numeric_limits<std::int32_t>::max()/sizeof(void*)};
 		if(new_size > max_size)
@@ -674,33 +674,33 @@ struct SaveObjectDoer final
 			{
 				auto& rov{*static_cast<rVal20a*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
-				strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
 				auto& rov{*static_cast<rVal20b*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
-				strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
 				auto& rov{*static_cast<rVal25*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
-				strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else
 			{
 				auto& rov{*static_cast<rVal25P*>(rov_ptr)};
 				if(rov.rvNumberOfStrings >= 0 && static_cast<std::size_t>(rov.rvNumberOfStrings) >= new_size)
 				{
-					strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
+					strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
 				else if(auto const new_strings{mvReAlloc(mV, rov.rvpStrings, new_size*sizeof(void*))})
 				{
 					rov.rvpStrings = static_cast<decltype(rov.rvpStrings)>(new_strings);
 					auto const old_size{rov.rvNumberOfStrings};
 					rov.rvNumberOfStrings = new_size;
-					strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), new_size};
+					strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), new_size};
 					for(auto i{old_size}; i < rov.rvNumberOfStrings; ++i)
 					{
 						strings[i] = nullptr;
@@ -708,7 +708,7 @@ struct SaveObjectDoer final
 				}
 				else if(rov.rvNumberOfStrings >= 0)
 				{
-					strings = {reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
+					strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
 			}
 		}
