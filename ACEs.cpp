@@ -12,6 +12,10 @@
 #include <memory>
 #include <span>
 #include <type_traits>
+#ifdef FUSION_ANDROID_RUNTIME
+#include <locale>
+#include <sstream>
+#endif
 #include <variant>
 
 using namespace std::string_literals;
@@ -207,10 +211,45 @@ static T float_from_string(string_view_t const s)
 	{
 		buf += static_cast<char>(c);
 	}
-	T v{};
-	std::ignore = std::from_chars(std::data(buf), std::data(buf) + std::size(buf), v);
-	return v;
 
+#ifdef FUSION_ANDROID_RUNTIME
+	// Android NDK r26 libc++ has no floating-point std::from_chars overload. Parse with a
+	// classic-locale stream so decimal points stay locale-independent, and accept the special
+	// spellings emitted by std::to_chars explicitly.
+	bool const negative{!buf.empty() && buf.front() == '-'};
+	std::string special{buf};
+	if(!special.empty() && (special.front() == '+' || special.front() == '-'))
+	{
+		special.erase(special.begin());
+	}
+	std::transform(special.begin(), special.end(), special.begin(), [](unsigned char c)
+	{
+		return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : static_cast<char>(c);
+	});
+	if(special == "inf" || special == "infinity")
+	{
+		auto const inf{std::numeric_limits<T>::infinity()};
+		return negative ? -inf : inf;
+	}
+	if(special == "nan" || (special.size() > 5 && special.starts_with("nan(") && special.back() == ')'))
+	{
+		return std::numeric_limits<T>::quiet_NaN();
+	}
+
+	std::istringstream input{buf};
+	input.imbue(std::locale::classic());
+	T value{};
+	input >> std::noskipws >> value;
+	if(input.fail() || !input.eof())
+	{
+		return T{};
+	}
+	return value;
+#else
+	T value{};
+	std::ignore = std::from_chars(std::data(buf), std::data(buf) + std::size(buf), value);
+	return value;
+#endif
 }
 
 struct ValueDoer final
@@ -582,7 +621,8 @@ struct SaveObjectDoer final
 			}
 			else
 			{
-				auto& rov{*static_cast<mc<Const, rVal25P>*>(rov_ptr)};
+				using rov_pointer_t = std::conditional_t<Const, rVal25P const*, rVal25P*>;
+				auto& rov{*reinterpret_cast<rov_pointer_t>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
 					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
@@ -591,7 +631,8 @@ struct SaveObjectDoer final
 				{
 					ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
+				auto const flag_pointer{reinterpret_cast<flags_element_t*>(std::addressof(rov.rvValueFlags))};
+				ret.flags = flags_span_t{flag_pointer, std::size_t{1}};
 			}
 		}
 		return ret;
