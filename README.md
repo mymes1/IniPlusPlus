@@ -9,7 +9,7 @@ The Android implementation now uses a **Java `CRunExtension` adapter plus this p
 Android support is **not complete or validated as a Fusion extension yet**:
 
 - The requested target is Fusion 2.5 build **295.10**.
-- The repository-root `AndroidSDK_Gradle.zip` currently reports `Fusion 292.0` in `MMFRuntime.java` (Gradle 4.10.1, Android Gradle Plugin 3.3.1). The integration helper refuses this mismatch; it is not silently used as a 295.10 substitute and is never copied into a runtime ZIP.
+- The repository-root `AndroidSDK_Gradle.zip` currently reports `Fusion 293.0` in `MMFRuntime.java` (Gradle 7.5, Android Gradle Plugin 7.4.2). The integration helper refuses this mismatch; it is not silently used as a 295.10 substitute and is never copied into a runtime ZIP.
 - This environment has no Java compiler, Android NDK, compatible 295.10 exporter source, or Sonic MFA/device. The NDK build, Java/Gradle compile, CExtLoad registration in build 295.10, Fusion merge/export and APK/device acceptance test have not run.
 - The current bridge preserves ACE IDs and parameter order, but it does not yet marshal Fusion object references or Ini++ custom-parameter payloads. Object-property ACEs are deliberately guarded rather than using fabricated pointers. See [Compatibility](docs/COMPATIBILITY.md).
 

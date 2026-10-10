@@ -4,7 +4,7 @@
 
 The Android path is an **unfinished source implementation**, not a completed Fusion extension release. The current direction is a Java `CRunExtension` adapter calling the shared C++ ACE bodies through this project's JNI library. Host C++ bridge tests pass. Java/Gradle compilation against the requested Fusion 2.5 build **295.10**, NDK compilation, Fusion `CExtLoad` registration, exporter ZIP merge, Sonic MFA APK export and a device test have not been completed.
 
-The only Gradle runtime archive currently at the repository root reports **Fusion 292.0** (`MMFRuntime.java`), with Gradle 4.10.1 / AGP 3.3.1. It is not the requested 295.10 exporter. The integration script fails closed on that mismatch. Do not substitute that runtime, include the proprietary ZIP in runtime artifacts, or claim Android support complete.
+The only Gradle runtime archive currently at the repository root reports **Fusion 293.0** (`MMFRuntime.java`), with Gradle 7.5 / AGP 7.4.2. It is not the requested 295.10 exporter. The integration script fails closed on that mismatch. Do not substitute that runtime, include the proprietary ZIP in runtime artifacts, or claim Android support complete.
 
 ## 1. Architecture
 
@@ -63,7 +63,7 @@ Java expression APIs produce `CValue` objects and the JNI bridge preserves strin
 | `bash tools/sync_workflow.sh --check` | Passed; `.github/workflows/main.yml` matches `ci/workflows/build.yml`. |
 | NDK build of `libIniPlusPlusBridge.so` | Not run locally; no NDK installed. No Android `.so` artifact is currently verified. |
 | Java compile against Fusion 295.10 | Not run; no `javac` and no matching 295.10 exporter source in the workspace. |
-| Exporter registration/Gradle build | Not run successfully. The integration helper was run against the available 292.0 archive and correctly rejected it without changing files. |
+| Exporter registration/Gradle build | Not run successfully. The integration helper was run against the available 293.0 archive and correctly rejected it without changing files. |
 | Windows Runtime/Edittime MFX build | Not run in this environment; requires Windows/MSVC. |
 | Fusion export of the Sonic MFA to an APK | Not performed. |
 | APK install and device test, including file compatibility and ACE behavior | Not performed. |

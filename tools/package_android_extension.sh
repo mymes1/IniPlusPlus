@@ -79,7 +79,7 @@ It requires the exact Fusion 2.5 build 295.10 Gradle exporter source tree and a 
 
 IMPORTANT: This source bundle has not been compiled against the exact 295.10 exporter, merged by a
 Fusion export, used to export the Sonic MFA, or run on a device. It is not a verified release. The
-repository's currently available AndroidSDK_Gradle.zip reports Fusion 292.0, so the integration
+repository's currently available AndroidSDK_Gradle.zip reports Fusion 293.0, so the integration
 script refuses it rather than silently using an older runtime.
 
 For integration, use the repository script:

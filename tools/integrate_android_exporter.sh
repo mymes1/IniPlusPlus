@@ -68,7 +68,7 @@ if version != "295.10":
     raise SystemExit(
         f"error: exporter runtime source reports Fusion {version}, not the required Fusion 295.10. "
         "No files were changed. The repository's AndroidSDK_Gradle.zip currently reports Fusion "
-        "292.0; it is not a substitute for the selected 295.10 exporter. Obtain the exact authorized "
+        "293.0; it is not a substitute for the selected 295.10 exporter. Obtain the exact authorized "
         "295.10 Gradle exporter project and retry."
     )
 

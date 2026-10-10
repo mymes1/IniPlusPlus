@@ -15,13 +15,13 @@ You can use `packaging/install-windows.bat` with the two built MFX files, or cop
 
 ## Android: not a verified install yet
 
-There is currently **no tested Android release ZIP**. The target is Fusion 2.5 build **295.10**, but the repository-root `AndroidSDK_Gradle.zip` identifies itself as Fusion 292.0. The integration helper refuses that mismatch. No build-295.10 Java/Gradle compile, exporter merge, Sonic MFA APK, or device test has been completed. Do not treat a source-only archive as a working extension.
+There is currently **no tested Android release ZIP**. The target is Fusion 2.5 build **295.10**, but the repository-root `AndroidSDK_Gradle.zip` identifies itself as Fusion 293.0. The integration helper refuses that mismatch. No build-295.10 Java/Gradle compile, exporter merge, Sonic MFA APK, or device test has been completed. Do not treat a source-only archive as a working extension.
 
 The intended path is a reusable runtime integration, so a normal MFA should need no event changes once the Java adapter is compatible and installed. However, the current bridge does not marshal object references or Ini++ custom-parameter payloads, and four object-property ACEs are guarded as no-ops. That gap must be resolved or accepted for the particular MFA before the no-event-change criterion can be claimed; see [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ### Build/integrate with the exact exporter
 
-1. Obtain the authorized Fusion 2.5 build 295.10 Gradle exporter project and its documented Java/Gradle/Android SDK tool versions. Do not use the repository's 292.0 archive as a substitute.
+1. Obtain the authorized Fusion 2.5 build 295.10 Gradle exporter project and its documented Java/Gradle/Android SDK tool versions. Do not use the repository's 293.0 archive as a substitute.
 2. Build the JNI library using Android NDK `26.1.10909125`:
 
    ```sh

@@ -62,7 +62,7 @@ The Android integration has not yet been compiled against the exact Fusion 2.5 b
 Gradle exporter, merged through a Fusion export, used to export the Sonic MFA, or tested on a
 physical device. Do not treat this candidate as a verified Android release.
 
-The repository's AndroidSDK_Gradle.zip currently reports runtime version Fusion 292.0, and the
+The repository's AndroidSDK_Gradle.zip currently reports runtime version Fusion 293.0, and the
 integration helper rejects that mismatch instead of silently substituting it. Obtain the authorized
 295.10 exporter project, run tools/integrate_android_exporter.sh, export the user's unmodified MFA,
 and complete the device/data-compatibility checks before marking Android support as complete.

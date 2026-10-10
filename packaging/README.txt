@@ -5,7 +5,7 @@ been compiled against the exact Fusion 2.5 build 295.10 Gradle exporter, merged/
 used to export the Sonic MFA, or run on a device. See docs/BUILD.md, docs/INSTALL.md and
 ANDROID-STATUS.txt in the release candidate.
 
-The repository's root AndroidSDK_Gradle.zip identifies as Fusion 292.0, not the selected 295.10
+The repository's root AndroidSDK_Gradle.zip identifies as Fusion 293.0, not the selected 295.10
 exporter. Do not substitute/repackage it. Generated runtime packages contain only Ini++-owned source
 and binaries, never proprietary Clickteam SDK/exporter files. The standard extension ZIP merge path
 is not yet verified.

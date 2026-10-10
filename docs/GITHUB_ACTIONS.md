@@ -4,7 +4,7 @@
 
 The workflow can build the project's shared-C++ host tests, Windows MFX files, and (on an Ubuntu runner with the pinned NDK) Android JNI libraries. It **does not** compile the Java adapter against the selected Fusion 2.5 build 295.10 exporter, export the Sonic MFA, or produce a device-tested APK. The Android artifact is an **unverified source/assets overlay**, not a standalone Fusion Android extension installer.
 
-The repository's `AndroidSDK_Gradle.zip` identifies as Fusion 292.0 and must not be substituted for the selected 295.10 exporter. Object references and Ini++ custom-parameter payloads also remain unimplemented in the adapter; see [COMPATIBILITY.md](COMPATIBILITY.md). Do not treat a green workflow run as proof that Android support is complete.
+The repository's `AndroidSDK_Gradle.zip` identifies as Fusion 293.0 and must not be substituted for the selected 295.10 exporter. Object references and Ini++ custom-parameter payloads also remain unimplemented in the adapter; see [COMPATIBILITY.md](COMPATIBILITY.md). Do not treat a green workflow run as proof that Android support is complete.
 
 ## 1. Make the workflow available on GitHub
 
@@ -54,7 +54,7 @@ Restart Fusion and open a copy of the MFA. The CI build checks the MFX exports, 
 
 ## 5. Integrate Android with the exact Fusion 295.10 exporter
 
-This is a developer integration workflow, **not a one-click installation**. It requires an authorized, extracted Fusion 2.5 build 295.10 Gradle exporter project and its supported JDK/Gradle/Android SDK versions. Those Java/Gradle versions must come from that exporter; do not copy the versions from the incompatible 292.0 archive.
+This is a developer integration workflow, **not a one-click installation**. It requires an authorized, extracted Fusion 2.5 build 295.10 Gradle exporter project and its supported JDK/Gradle/Android SDK versions. Those Java/Gradle versions must come from that exporter; do not copy the versions from the incompatible 293.0 archive.
 
 The most reproducible route is to build native libraries locally with the pinned NDK:
 
