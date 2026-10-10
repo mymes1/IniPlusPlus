@@ -258,6 +258,12 @@ namespace
 		}
 	}
 
+	void run_unicode_conversion_tests()
+	{
+		auto const rocket{lSDK::native_from_utf16(std::u16string_view{u"\U0001F680"})};
+		check(rocket == "\xF0\x9F\x9A\x80", "UTF-16 surrogate pairs convert to UTF-8 without wchar_t assumptions");
+	}
+
 	void run_file_lifecycle_tests(std::filesystem::path const& sandbox, std::filesystem::path const& parent)
 	{
 		// Fusion edit data may contain a Windows path. It is normalized beneath filesDir before
@@ -299,6 +305,7 @@ int main()
 	std::filesystem::create_directories(base);
 
 	run_sandbox_tests(sandbox, base);
+	run_unicode_conversion_tests();
 	run_runtime_tests(sandbox);
 	run_legacy_edit_data_test(sandbox);
 	run_file_lifecycle_tests(sandbox, base);

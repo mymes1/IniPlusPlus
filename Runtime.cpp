@@ -6,6 +6,7 @@
 #endif
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -116,29 +117,30 @@ static constexpr void thayer_crypt(std::string& inp, std::string_view const key)
 	}
 
 	constexpr std::size_t const SBOX_SIZE{256};
-	std::array<char, SBOX_SIZE> sbox{}, sbox2{};
+	// Work in explicit bytes instead of relying on implementation-defined `char` signedness.
+	// This preserves the Windows cipher's low eight bits on Android ABIs where plain char is unsigned.
+	std::array<std::uint8_t, SBOX_SIZE> sbox{}, sbox2{};
 	for(std::size_t i{0}; i < std::size(sbox); ++i)
 	{
-		static_assert(std::is_signed_v<char>);
-		sbox.at(i) = static_cast<char>(i);
+		sbox.at(i) = static_cast<std::uint8_t>(i);
 	}
 	for(std::size_t i{0}; i < std::size(sbox2); ++i)
 	{
-		sbox2.at(i) = key.at(i % std::size(key));
+		sbox2.at(i) = static_cast<std::uint8_t>(static_cast<unsigned char>(key.at(i % std::size(key))));
 	}
 	for(std::size_t i{0}, j{0}; i < SBOX_SIZE; ++i)
 	{
-		j = ((j + static_cast<std::uint32_t>(sbox.at(i)) + static_cast<std::uint32_t>(sbox2.at(i))) % SBOX_SIZE);
+		j = (j + sbox.at(i) + sbox2.at(i)) % SBOX_SIZE;
 		std::swap(sbox.at(i), sbox.at(j));
 	}
 	for(std::size_t x{0}, i{0}, j{0}; x < std::size(inp); ++x)
 	{
 		i = ((i + 1) % SBOX_SIZE);
-		j = ((j + static_cast<std::uint32_t>(sbox[i])) % SBOX_SIZE);
+		j = (j + sbox[i]) % SBOX_SIZE;
 		std::swap(sbox.at(i), sbox.at(j));
-		auto const t{(static_cast<std::uint32_t>(sbox.at(i)) + static_cast<std::uint32_t>(sbox.at(j))) % SBOX_SIZE};
+		auto const t{(sbox.at(i) + sbox.at(j)) % SBOX_SIZE};
 		auto const k{sbox.at(t)};
-		inp[x] = (inp[x] ^ k);
+		inp[x] = static_cast<char>(static_cast<unsigned char>(inp[x]) ^ k);
 	}
 }
 void Data::toggle_encryption(std::string& d, std::string_view key) noexcept

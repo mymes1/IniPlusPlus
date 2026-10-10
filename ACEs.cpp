@@ -539,11 +539,17 @@ struct SaveObjectDoer final
 	template<bool Const>
 	static auto get_alterables(std::conditional_t<Const, RunObject const, RunObject>& obj)
 	{
+		using values_element_t = mc<Const, CValue>;
+		using strings_element_t = std::conditional_t<Const, void const* const, void*>;
+		using flags_element_t = mc<Const, std::int32_t>;
+		using values_span_t = std::span<values_element_t>;
+		using strings_span_t = std::span<strings_element_t>;
+		using flags_span_t = std::span<flags_element_t>;
 		struct
 		{
-			std::span<mc<Const, CValue>> values;
-			std::span<std::conditional_t<Const, void const* const, void*>> strings;
-			std::span<mc<Const, std::int32_t>> flags;
+			values_span_t values;
+			strings_span_t strings;
+			flags_span_t flags;
 		} ret;
 		if((obj.roHo.hoOEFlags & OEFLAG_VALUES) != 0)
 		{
@@ -554,38 +560,38 @@ struct SaveObjectDoer final
 			{
 				auto& rov{*static_cast<mc<Const, rVal20a>*>(rov_ptr)};
 				assert(false); //not easy to support values in this version like this
-				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
 				auto& rov{*static_cast<mc<Const, rVal20b>*>(rov_ptr)};
-				ret.values = decltype(ret.values){rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
-				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.values = values_span_t{rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
+				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
 				auto& rov{*static_cast<mc<Const, rVal25>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
-					ret.values = decltype(ret.values){rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
+					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
 				}
-				ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
+				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
 			}
 			else
 			{
 				auto& rov{*static_cast<mc<Const, rVal25P>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
-					ret.values = decltype(ret.values){rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
+					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
 				}
 				if(rov.rvNumberOfStrings >= 0)
 				{
-					ret.strings = decltype(ret.strings){reinterpret_cast<decltype(ret.strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
+					ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				ret.flags = decltype(ret.flags){reinterpret_cast<decltype(ret.flags)::pointer>(&rov.rvValueFlags), 1};
+				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
 			}
 		}
 		return ret;

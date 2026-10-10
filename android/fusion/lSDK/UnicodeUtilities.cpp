@@ -292,4 +292,9 @@ namespace lSDK
 	{
 		return utf16_to_utf8(to_utf16_from_wide(wide));
 	}
+
+	string_t native_from_utf16(std::u16string_view const utf16)
+	{
+		return utf16_to_utf8(utf16);
+	}
 }

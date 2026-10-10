@@ -59,6 +59,8 @@ namespace lSDK
 	// UTF-8 <-> UTF-16 helpers used when a true wide string is needed (Windows code page handling).
 	string16_t utf16_from_native(string_view_t );
 	string_t   native_from_utf16(string_view16_t);
+	// Java String supplies UTF-16 code units (`jchar`/char16_t), independent of Android wchar_t size.
+	string_t   native_from_utf16(std::u16string_view);
 	// On Android the extension's own strings are already UTF-8, so converting "wide" (the string_t
 	// of the Windows build) is the identity; this overload keeps shared sources that pass string_t
 	// to narrow_from_wide() compiling, exactly as they would on Windows where string_t is wide.

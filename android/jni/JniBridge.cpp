@@ -35,8 +35,15 @@ namespace
 		std::string result;
 		try
 		{
-			result = lSDK::native_from_utf16(
-				std::u16string_view{reinterpret_cast<char16_t const*>(chars), static_cast<std::size_t>(length)});
+			// jchar is a UTF-16 code unit; Android wchar_t is 32 bits, so copy without
+			// reinterpreting the JNI buffer as wchar_t or relying on aliasing char16_t.
+			std::u16string utf16;
+			utf16.reserve(static_cast<std::size_t>(length));
+			for(jsize index{}; index < length; ++index)
+			{
+				utf16.push_back(static_cast<char16_t>(chars[index]));
+			}
+			result = lSDK::native_from_utf16(std::u16string_view{utf16});
 		}
 		catch(...)
 		{
