@@ -154,7 +154,7 @@ tools/sync_workflow.sh --check
 
 CI is intended to run the generator/host tests (including ASan/UBSan), MSVC Win32 MFX builds, and the NDK JNI build, uploading **separate** Windows and Android-native/source artifacts. It cannot access the user's licensed 295.10 exporter source or Sonic MFA, so it must not claim a complete export or publish a verified release bundle. Workflow changes under `.github/workflows/` require the GitHub token used to push to have the workflow-scoped permission; if push is rejected for that reason, reconnect GitHub in Arena with that permission.
 
-The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input; it must not be copied into generated ZIPs or artifacts.
+The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input; it must not be copied into generated ZIPs or artifacts. For click-by-click workflow triggering, artifact download, and Windows/Android integration steps, see [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
 
 ## 10. Troubleshooting
 

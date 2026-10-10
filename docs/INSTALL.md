@@ -1,5 +1,7 @@
 # Installing and using Ini++
 
+For triggering builds and downloading artifacts from GitHub Actions, see the [GitHub Actions build and installation guide](GITHUB_ACTIONS.md). It explains which artifacts are usable and which Android acceptance steps remain manual.
+
 ## Windows / editor
 
 Install the matching Windows MFX pair under your Fusion 2.5 Unicode installation:

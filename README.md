@@ -44,7 +44,7 @@ tools/integrate_android_exporter.sh \
   --assemble-debug
 ```
 
-Exact commands, Java/Gradle version discovery, compatibility notes and limitations are in [docs/BUILD.md](docs/BUILD.md), [docs/INSTALL.md](docs/INSTALL.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+Exact commands, Java/Gradle version discovery, compatibility notes and limitations are in [docs/BUILD.md](docs/BUILD.md), [docs/INSTALL.md](docs/INSTALL.md), [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## Repository map
 
