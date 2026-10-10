@@ -1,32 +1,30 @@
 # Building Ini++
 
-This repository retains the existing Fusion 2.5 Windows MFX and adds an Android Java/JNI source port. The Android code is **not yet a verified release**: host tests pass, but no NDK build, Java/Gradle compile against build 295.10, Fusion export, Sonic APK or device test has been completed in this environment.
+This repository retains the existing Fusion 2.5 Windows MFX and adds an Android Java/JNI source port. The Android code is **not yet a verified release**: host tests pass, but a successful NDK build, Fusion 295.10 source merge/Java compile, normal MFA export and device test have not all been completed.
 
 ## 1. Targets and exact dependencies
 
 | Component | Target/version | Current verification |
 | --- | --- | --- |
-| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Reproducible MSBuild commands below; actual CI build still needed to validate this branch's final changes. |
-| Android C++ shared library | NDK r26.1.10909125, `ndk-build`, C++20, Android API 21; ABIs `arm64-v8a`, `armeabi-v7a`, `x86_64` | Source/configuration only; NDK absent locally. CI builds this independent JNI/native half. |
-| Android Java runtime integration | **Fusion 2.5 build 295.10**, the user's selected target | Blocked: the only Gradle archive at repo root reports **Fusion 293.0**, not 295.10. Do not silently use it. |
-| Gradle/Android Gradle Plugin | Use the wrapper/plugin from the exact authorized 295.10 exporter project | Not yet known/validated. The repository's mismatched 293.0 archive declares Gradle 7.5 and AGP 7.4.2; those versions are recorded for identification only and are not certified for build 295.10. |
-| Java/JDK for exporter build | Must be compatible with the exact 295.10 Gradle wrapper and Android Gradle Plugin | Unknown until the matching exporter project is supplied. Do not guess or upgrade its wrapper/plugin as a workaround. |
+| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Reproducible MSBuild commands below; the latest Windows CI build still needs to pass. |
+| Android C++ shared library | NDK r26.1.10909125, `ndk-build`, C++20, Android API 21; ABIs `arm64-v8a`, `armeabi-v7a`, `x86_64` | Host bridge tests pass. The pinned NDK is installed in CI, but a passing post-fix native build is still required. |
+| Android Java runtime integration | Fusion 2.5 build **295.10** target; Java source API baseline from Fusion **293.0** | Source ZIP is implemented; Fusion 295.10 merge, registration, Java/Gradle compile, MFA export and device run are not yet verified. |
+| Gradle/Android Gradle Plugin | Use Fusion 295.10 exporter's own Gradle wrapper and plugin | The 293.0 reference archive reports Gradle 7.5 / AGP 7.4.2. Do not copy those project settings into the target exporter or assume they prove 295.10 compatibility. |
+| Java/JDK for exporter build | Use the JDK supported by the target Fusion 295.10 exporter | No local JDK/`javac`; exact exporter toolchain compile remains pending. |
 | Python | Python 3.9+ | Used by the ACE metadata generator/check. |
-| Host C++ tests | GCC 11+ or Clang 14+, C++20 | Run with `tools/run_host_tests.sh`; locally verified with GCC 12. This is not an NDK/JNI/Java compile. |
+| Host C++ tests | GCC 11+ or Clang 14+, C++20 | Run with `tools/run_host_tests.sh`; host bridge and package-layout tests run locally. This is not an NDK/JNI/Java compile. |
 
-### Confirmed archive mismatch
+### Fusion 293.0 Java API baseline and Fusion 295.10 target
 
-`AndroidSDK_Gradle.zip` is present at the repository root as a proprietary input. It is **not** copied into generated artifacts. Inspection of this exact archive gives:
+`AndroidSDK_Gradle.zip` is present locally at the repository root as a proprietary input. It reports `Fusion 293.0` in `app/src/main/java/Runtime/MMFRuntime.java`, Gradle `7.5`, and Android Gradle Plugin `7.4.2`. We use the archive only to inspect the Java `CRunExtension`/`CBinaryFile` API surface; it is ignored by Git and is never copied into generated artifacts.
 
-- `app/src/main/java/Runtime/MMFRuntime.java`: `Fusion 293.0`
-- `gradle/wrapper/gradle-wrapper.properties`: Gradle `7.5`
-- root `build.gradle`: Android Gradle Plugin `7.4.2`
+The Android extension package is built from Ini++-owned Java source and NDK libraries, not from the 293.0 Gradle project. It uses Clickteam's documented runtime-merge ZIP layout (`src/Extensions/` and `assets/mmf/<ABI>/`) and is intended to be installed as `<Fusion>/Data/Runtime/Android/INI++.zip` ([Clickteam Android SDK guide](https://github.com/ClickteamLLC/android/blob/master/docs/index.md#packaging)). Fusion 295.10 is the target exporter and should own the Gradle, AndroidX, SDK and target-SDK configuration. The 293.0 archive is an API reference—not the 295.10 exporter, dependency bundle or build configuration.
 
-The requested exporter is build **295.10**. These are different versions. `tools/integrate_android_exporter.sh` explicitly checks the runtime source and fails before changing files unless it finds `Fusion 295.10`. Obtain the exact authorized 295.10 exporter project and its supported JDK/SDK/Gradle/AGP details before continuing. The source tree inside the 293.0 archive is not redistributed or used as a substitute.
+The user-provided compatibility assumption is that the `CRun`/`CExtension`/`CBinaryFile` Java runtime API did not change between 293.0 and 295.10. `tools/integrate_android_exporter.sh` therefore checks API members and accepts source trees labelled 293.0 or 295.10. This static source guard does not prove source-zip merging, registration, Java compilation or runtime compatibility in 295.10; the target exporter test remains required.
 
 ## 2. Android architecture and boundaries
 
-Android uses a Java `CRunExtension` adapter (`android/java/Extensions/CRunIniPlusPlus.java`) and a project-owned JNI shared library (`android/jni/JniBridge.cpp`). The runtime must explicitly register the Java class in `Extensions/CExtLoad.java`; the integration helper adds that registration to the **exact** 295.10 exporter project. The JNI library is copied under `app/src/main/assets/mmf/<ABI>/libIniPlusPlusBridge.so`, where the Gradle runtime's `MMFRuntime` loads non-`CRun*.so` assets with `System.load()`.
+Android uses a Java `CRunExtension` adapter (`android/java/Extensions/CRunIniPlusPlus.java`) and a project-owned JNI shared library (`android/jni/JniBridge.cpp`). The extension ZIP carries sources under `src/Extensions/` and libraries under `assets/mmf/<ABI>/`, as expected by the Fusion Android runtime merge convention. The adapter must also be registered in the target exporter's `Extensions/CExtLoad.java` flow; the optional direct-project helper can insert that branch without replacing the exporter file. The Gradle runtime loads non-`CRun*.so` assets with `System.load()`.
 
 The JNI route does not include or recreate Clickteam's old native extension ABI, and it does not require `RuntimeNative.h`. `android/fusion/` provides only the types/helpers needed to compile the shared Ini++ C++ implementation and run host tests; those declarations are not a substitute for exporter integration. The generated Java parameter table, C++ dispatch table and declarations come from `Menus.cpp` and `ACEs.cpp` through `tools/gen_android_aces.py`.
 
@@ -45,8 +43,8 @@ This is source-level integration work, not proof that the class registration, JN
 | `android/tests/BridgeTests.cpp` | Host tests; does not compile JNI or Java. |
 | `tools/gen_android_aces.py` | Generates/validates Java and C++ ACE parameter/dispatch tables. |
 | `tools/build_android.sh` | NDK native build and JNI export checks. |
-| `tools/integrate_android_exporter.sh` | Version-guards, copies adapter/native files and registers the class in the exact exporter source. |
-| `tools/package_android_extension.sh` | Packages the overlay ZIP from actual NDK outputs; refuses missing ABI binaries by default. |
+| `tools/integrate_android_exporter.sh` | Optional direct-project source/API check and integration for Fusion 293.0 or 295.10; inserts the class in the target `CExtLoad.java` without overwriting it. |
+| `tools/package_android_extension.sh` | Packages/verifies the `Data/Runtime/Android` ZIP (`src/Extensions`, `assets/mmf`); refuses missing ABI binaries by default and rejects JAR/AAR/class files. |
 | `ci/workflows/build.yml` | Canonical CI; `.github/workflows/main.yml` is mirrored from it. |
 
 ## 4. Host checks (no Fusion/NDK/JDK required)
@@ -59,15 +57,16 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The script runs the generator check, compiles `BridgeTests.cpp`, `Bridge.cpp`, the shared runtime/ACEs, the Android path/file layer and Unicode utilities, then executes the tests. Current cases cover:
+The script runs the generator check, compiles `BridgeTests.cpp`, `Bridge.cpp`, the shared runtime/ACEs, the Android path/file layer and Unicode utilities, executes the tests, then smoke-tests the extension ZIP with placeholder `.so` files. Current cases cover:
 
 - generated ACE count, action/condition argument order and number/string/position dispatch;
 - UTF-8 expression results, numeric return types and the packed X/Y `PARAM_POSITION` encoding;
 - payload-only legacy v1 ANSI (Windows-1252) and v2 Unicode edit data used by the Java adapter;
 - a safe no-op when an object-property ACE receives a placeholder instead of a marshalled Fusion object;
-- autosave, Windows-drive path mapping to a filesDir-relative path, traversal rejection, outside absolute paths and symlink escapes.
+- autosave, Windows-drive path mapping to a filesDir-relative path, traversal rejection, outside absolute paths and symlink escapes;
+- the Fusion `src/Extensions` + `assets/mmf` ZIP layout, install destination, and exclusion of `.class`/`.jar`/`.aar` and proprietary exporter files (using placeholder, non-runnable `.so` files).
 
-These tests prove the tested C++ paths only. They do not compile `JniBridge.cpp`, invoke `javac`/Gradle, load `CExtLoad`, produce an APK or establish behavior in a proprietary runtime.
+These tests prove the tested C++ paths and packaging structure only. They do not compile `JniBridge.cpp`, invoke `javac`/Gradle, validate 295.10's merge/`CExtLoad` behavior, produce a real APK or establish behavior in a proprietary runtime.
 
 ## 5. Windows MFX
 
@@ -104,45 +103,55 @@ build/android/assets/mmf/x86_64/libIniPlusPlusBridge.so
 
 The script checks the JNI exports for all seven Java native methods. It does not validate that the classes compile in the selected exporter or that the runtime can load the library. `tools/build_android.sh --check-only` checks generated tables only; it is not a native build.
 
-## 7. Integrate with Fusion 2.5 build 295.10
+## 7. Package for Fusion's Android runtime merge
 
-The integration requires an **authorized, extracted Gradle exporter source tree whose `MMFRuntime.java` identifies as Fusion 295.10**. It refuses the checked-in 293.0 archive and other versions:
+After a successful NDK build, create the source/assets ZIP in the standard Fusion Android extension layout:
+
+```sh
+tools/package_android_extension.sh \
+  --android-dir build/android \
+  --out build/android-package
+
+# Optional: install the completed ZIP into a local Fusion installation.
+tools/package_android_extension.sh \
+  --android-dir build/android \
+  --out build/android-package \
+  --install-to /path/to/Fusion/Data/Runtime/Android
+```
+
+The resulting `build/android-package/INI++.zip` has this layout:
+
+```text
+src/Extensions/CRunIniPlusPlus.java
+src/Extensions/IniPlusPlusAceParams.java
+assets/mmf/arm64-v8a/libIniPlusPlusBridge.so
+assets/mmf/armeabi-v7a/libIniPlusPlusBridge.so
+assets/mmf/x86_64/libIniPlusPlusBridge.so
+```
+
+This is raw Java source, not a precompiled `.class`/`.jar`/`.aar` extension. It has no direct AndroidX imports and does not bundle the root `AndroidSDK_Gradle.zip` or any vendor exporter/runtime files. Fusion 295.10 is expected to merge these files and compile them with its own Gradle/SDK/target-SDK setup. The package script verifies the archive paths and refuses JAR/AAR/class or proprietary exporter entries. A package check with placeholder `.so` files is not a native build or runtime test.
+
+The ZIP does not contain a copied vendor `CExtLoad.java`. The adapter must be registered in the target exporter's loader flow. The packager writes `CExtLoad-registration.patch` next to the ZIP as a manual reference; it is not a complete loader and is not applied by the package builder. Whether Fusion 295.10 automatically performs this registration from the installed ZIP must be verified during export.
+
+The optional direct-project helper can check and integrate against an extracted Fusion 293.0 or 295.10 Gradle project:
 
 ```sh
 tools/integrate_android_exporter.sh \
-  --exporter /path/to/extracted-Fusion-295.10-Gradle-project \
+  --exporter /path/to/extracted-Fusion-295.10-project \
   --android-dir build/android \
   --check-only
 
-# After the source checks pass, copy Java files/libs and patch CExtLoad.java:
 tools/integrate_android_exporter.sh \
-  --exporter /path/to/extracted-Fusion-295.10-Gradle-project \
-  --android-dir build/android
-
-# Optional Gradle compile/APK build using that project's own wrapper:
-tools/integrate_android_exporter.sh \
-  --exporter /path/to/extracted-Fusion-295.10-Gradle-project \
+  --exporter /path/to/extracted-Fusion-295.10-project \
   --android-dir build/android \
   --assemble-debug
 ```
 
-The helper prints the wrapper Gradle and Android Gradle Plugin versions read from the exporter, checks the Java API members the adapter calls, refuses to overwrite differing source/assets, copies the adapter and ABI libraries, and adds `CRunIniPlusPlus` to `CExtLoad.java`. `--assemble-debug` runs `./gradlew --no-daemon :app:assembleDebug` after integration and verifies an APK file was produced. It still does not export the user's MFA or test a device.
+The helper checks only the Java API members used by the adapter, copies files into that project's `app/src/main` tree, and inserts a `CExtLoad` branch. With `--assemble-debug`, it runs that exporter's own Gradle wrapper. A Java source guard is not a compile; a successful Gradle build still does not export the user's MFA or test a device.
 
-The helper has only been run against the repository's mismatched 293.0 archive to confirm the version guard rejects it without modifying files. The successful 295.10 path has **not** been exercised.
+For source-layout debugging only, `--allow-incomplete` writes `INI++-INCOMPLETE.zip` and a `MISSING-BINARIES.txt` marker. It refuses installation. `tools/package_release.sh` rejects an incomplete archive and always stamps any release candidate as Android-unverified.
 
-## 8. Fusion Android overlay ZIP and candidate packaging
-
-After a successful NDK build, create the app-source/assets overlay ZIP:
-
-```sh
-tools/package_android_extension.sh --android-dir build/android --out build/android-package
-```
-
-It requires all three configured ABI libraries and creates `build/android-package/INI++.zip`. The ZIP contains Ini++-owned Java files, the built JNI `.so` assets, a small `CExtLoad` registration patch and a warning README. It contains **no Clickteam SDK/exporter source**. It is an overlay for the extracted Gradle project, not a verified Fusion `Data/Runtime/Android` merge or a tested installable extension. The actual exporter integration uses the version-guarded script above.
-
-For source-layout debugging only, `--allow-incomplete` writes `INI++-INCOMPLETE.zip` and a `MISSING-BINARIES.txt` marker. `tools/package_release.sh` refuses that file and always stamps any release candidate as Android-unverified. It cannot produce a verified complete release by itself.
-
-A full product release still requires real runtime artifacts plus the exact build 295.10 integration and the user's Sonic MFA APK/device acceptance test. Do not upload a host-test-only or source-only ZIP as a completed Android extension.
+A full product release still requires the real NDK build, Fusion 295.10 merge/registration/compile, the user's unchanged Sonic MFA APK export and device acceptance test. Do not upload a package-only ZIP as a completed Android extension.
 
 ## 9. CI and artifact workflow
 
@@ -161,10 +170,10 @@ The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input
 | Symptom | Meaning / next step |
 | --- | --- |
 | `ndk-build was not found` | Install NDK r26.1.10909125 and set `ANDROID_NDK_HOME`, or pass `--ndk`. |
-| Integration reports `Fusion 293.0, not ... 295.10` | The supplied source tree is the wrong exporter version. Do not override the check; obtain the authorized 295.10 project. |
-| Integration reports missing `CExtLoad` or Java API members | Exporter source layout/API differs. Stop and compare against the exact 295.10 API; do not patch in a different runtime silently. |
-| `tools/package_android_extension.sh` reports missing ABI libraries | Run a real NDK build for the configured ABIs. An incomplete ZIP is source-only and not a release. |
-| Gradle/JDK fails | Use the Java/Gradle/AGP versions supported by the exact 295.10 exporter, not those read from the mismatched 293.0 archive. Record them in the build log. |
+| Integration rejects an exporter version | The direct-project helper accepts only Fusion 293.0/295.10 labels and checks the API surface. Use the target exporter and inspect the reported missing member; do not bypass the guard. |
+| Integration reports missing `CExtLoad` or Java API members | Exporter source layout/API differs. Stop and compare the actual target API; do not copy/replace a vendor loader from another version. |
+| `tools/package_android_extension.sh` reports missing ABI libraries | Run a real NDK build for the configured ABIs. An incomplete ZIP is source-only, marked incomplete and cannot be installed. |
+| Gradle/JDK fails | Use the Java/Gradle/AGP versions supplied by the target Fusion 295.10 exporter. The 293.0 reference project's configuration is not copied to the package. |
 | APK starts but Ini++ is missing | Confirm CExtLoad registers `CRunIniPlusPlus`, `libIniPlusPlusBridge.so` is in `assets/mmf/<device ABI>/`, and logcat has no JNI load/symbol errors. |
 | Save/load is rejected | Paths are confined to the app's files directory. Legacy drive-form paths are mapped below `filesDir`; traversal and external paths are refused. |
 | Windows build cannot find lSDK headers/libraries | Run `git submodule update --init --recursive` and build from the VS 2022 Win32 configuration. |

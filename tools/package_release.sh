@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Assemble a clearly labelled release candidate. This tool never labels an Android build verified:
-# that requires the matching Fusion 295.10 exporter, a normal MFA/APK export, and a device test.
+# the source ZIP must be merged/compiled by Fusion 295.10, followed by a normal MFA/APK export and device test.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -58,14 +58,15 @@ cp "$ROOT/packaging/install-windows.bat" "$STAGE/windows/install.bat"
 cat > "$STAGE/ANDROID-STATUS.txt" <<'EOF'
 ANDROID STATUS: UNVERIFIED RELEASE CANDIDATE
 
-The Android integration has not yet been compiled against the exact Fusion 2.5 build 295.10
-Gradle exporter, merged through a Fusion export, used to export the Sonic MFA, or tested on a
-physical device. Do not treat this candidate as a verified Android release.
+The Android extension ZIP contains Ini++ Java source and project-owned JNI shared libraries in the
+Fusion Data/Runtime/Android merge layout. Its Java adapter is based on the Fusion 293.0
+CRunExtension API surface and is intended to be source-compiled by Fusion 2.5 build 295.10. That
+exact merge, CExtLoad registration, Gradle compile, normal MFA export and physical-device test have
+not yet been completed. Do not treat this candidate as a verified Android release.
 
-The repository's AndroidSDK_Gradle.zip currently reports runtime version Fusion 293.0, and the
-integration helper rejects that mismatch instead of silently substituting it. Obtain the authorized
-295.10 exporter project, run tools/integrate_android_exporter.sh, export the user's unmodified MFA,
-and complete the device/data-compatibility checks before marking Android support as complete.
+The proprietary AndroidSDK_Gradle.zip is never copied into this release. Test the source package
+with the authorized 295.10 exporter, export the user's unmodified MFA, and complete the device/data-
+compatibility checks before marking Android support as complete.
 EOF
 
 if [ "$WITH_SOURCE" = 1 ]; then

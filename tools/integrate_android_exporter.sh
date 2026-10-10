@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Copy the Java adapter and NDK library into an extracted Fusion 2.5 Android Gradle project,
-# then register CRunIniPlusPlus in that project's CExtLoad.java. The script is deliberately pinned
-# to the requested Fusion 2.5 build 295.10 and refuses other source trees.
+# Developer fallback: copy the Java adapter and NDK libraries into an extracted Fusion Android
+# Gradle project, then register CRunIniPlusPlus in that project's CExtLoad.java. The supported
+# source API baselines are Fusion 2.5 builds 293.0 and 295.10; both must pass the member checks below.
+# For normal installation, package and install INI++.zip under Data/Runtime/Android instead.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$EXPORTER" ]; then
-	echo "error: pass --exporter /path/to/the/extracted-Fusion-295.10-Gradle-project" >&2
+	echo "error: pass --exporter /path/to/an/extracted-Fusion-Android-Gradle-project" >&2
 	exit 2
 fi
 if [ ! -d "$EXPORTER" ]; then
@@ -64,22 +65,25 @@ assemble = sys.argv[7] == "1"
 mmf = mmf_path.read_text(encoding="utf-8", errors="replace")
 match = re.search(r'\bversion\s*=\s*"Fusion\s+([^" ]+)"', mmf)
 version = match.group(1) if match else "unknown"
-if version != "295.10":
+supported_versions = {"293.0", "295.10"}
+if version not in supported_versions:
     raise SystemExit(
-        f"error: exporter runtime source reports Fusion {version}, not the required Fusion 295.10. "
-        "No files were changed. The repository's AndroidSDK_Gradle.zip currently reports Fusion "
-        "293.0; it is not a substitute for the selected 295.10 exporter. Obtain the exact authorized "
-        "295.10 Gradle exporter project and retry."
+        f"error: exporter runtime source reports Fusion {version}; this adapter is based on the "
+        "Fusion 293.0 Java CRunExtension API and only accepts the inspected 293.0/295.10 version "
+        "labels. No files were changed. Use the Data/Runtime/Android source ZIP route for Fusion "
+        "295.10 and verify the generated project with that exporter's own toolchain."
     )
 
 # Validate the subset of the Java API this adapter calls. This is a source guard, not a Java compile.
 java_root = mmf_path.parent.parent
 checks = {
-    "Extensions/CRunExtension.java": ["public abstract class CRunExtension", "getNumberOfConditions()", "createRunObject(CBinaryFile"],
+    "Extensions/CRunExtension.java": ["public abstract class CRunExtension", "getNumberOfConditions()", "createRunObject(CBinaryFile", "handleRunObject()", "destroyRunObject(boolean", "condition(int", "action(int", "expression(int"],
     "Actions/CActExtension.java": ["getParamExpString", "getParamExpDouble", "getParamExpression", "getParamPosition", "getParamFilename", "getParamFilename2"],
     "Conditions/CCndExtension.java": ["getParamExpString", "getParamExpDouble", "getParamExpression", "getParamPosition", "getParamFilename", "getParamFilename2"],
+    "Objects/CExtension.java": ["getControlsContext()", "getExpParam()"],
+    "Params/CPositionInfo.java": ["public int x;", "public int y;"],
     "Services/CBinaryFile.java": ["byte data[]"],
-    "Expressions/CValue.java": ["CValue(int", "CValue(double", "CValue(String"],
+    "Expressions/CValue.java": ["CValue(int", "CValue(double", "CValue(String", "getInt()", "getDouble()", "getString()"],
 }
 for relative, needles in checks.items():
     path = java_root / relative
@@ -88,7 +92,7 @@ for relative, needles in checks.items():
     text = path.read_text(encoding="utf-8", errors="replace")
     missing = [needle for needle in needles if needle not in text]
     if missing:
-        raise SystemExit(f"error: Fusion 295.10 Java API mismatch in {path}: missing {missing}")
+        raise SystemExit(f"error: Fusion {version} Java API mismatch in {path}: missing {missing}")
 
 extload = extload_path.read_text(encoding="utf-8", errors="replace")
 registration = "object=new CRunIniPlusPlus();"

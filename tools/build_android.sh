@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reproducibly build the project-owned JNI runtime library with Android NDK ndk-build.
-# This does not need RuntimeNative.h: the Java CRunExtension adapter is registered separately
-# into the exact Fusion Android exporter source tree by tools/integrate_android_exporter.sh.
+# This does not need RuntimeNative.h: package the resulting Java sources and ABI libraries into a
+# Fusion Data/Runtime/Android extension ZIP with tools/package_android_extension.sh.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -137,9 +137,10 @@ cat <<EOF
 
 JNI runtime library build complete: $OUT_DIR/assets/mmf/<abi>/libIniPlusPlusBridge.so
 
-This is only the project-owned native half. To integrate the Java CRunExtension class and its
-CExtLoad registration into the target Fusion exporter, run:
-  tools/integrate_android_exporter.sh --exporter /path/to/Fusion-295.10-Gradle-project --android-dir "$OUT_DIR"
-The integration script rejects a different runtime version and compiles only after the matching
-exporter source has been verified. No APK export/device test is implied by this NDK build.
+Package the Java sources and ABI libraries in Clickteam's Android-extension merge layout:
+  tools/package_android_extension.sh --android-dir "$OUT_DIR" --out build/android-package
+Then install build/android-package/INI++.zip to <Fusion>/Data/Runtime/Android/INI++.zip.
+The source adapter uses the Fusion 293.0 CRunExtension Java API surface; the target Fusion 295.10
+exporter must still be allowed to merge, register and compile this package. No APK export/device
+test is implied by this NDK build.
 EOF

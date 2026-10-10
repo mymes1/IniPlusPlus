@@ -2,9 +2,9 @@
 
 ## Status first
 
-The Android path is an **unfinished source implementation**, not a completed Fusion extension release. The current direction is a Java `CRunExtension` adapter calling the shared C++ ACE bodies through this project's JNI library. Host C++ bridge tests pass. Java/Gradle compilation against the requested Fusion 2.5 build **295.10**, NDK compilation, Fusion `CExtLoad` registration, exporter ZIP merge, Sonic MFA APK export and a device test have not been completed.
+The Android path is an **unfinished source implementation**, not a completed Fusion extension release. It uses a Java `CRunExtension` adapter calling shared C++ ACE bodies through this project's JNI library. The Java source baseline is the Fusion 2.5 **293.0** API in the locally available exporter archive; the intended target remains Fusion 2.5 **295.10**, which should source-merge and compile the adapter. That 293-to-295.10 assumption is not yet validated by a target Gradle compile, `CExtLoad` registration, Fusion merge, Sonic MFA APK export or device test.
 
-The only Gradle runtime archive currently at the repository root reports **Fusion 293.0** (`MMFRuntime.java`), with Gradle 7.5 / AGP 7.4.2. It is not the requested 295.10 exporter. The integration script fails closed on that mismatch. Do not substitute that runtime, include the proprietary ZIP in runtime artifacts, or claim Android support complete.
+The root `AndroidSDK_Gradle.zip` identifies as Fusion 293.0 (Gradle 7.5 / AGP 7.4.2). It is used only to inspect Java API declarations. The source package contains no vendor runtime/exporter files, no JAR/AAR dependencies and no direct AndroidX imports. The target Fusion 295.10 exporter must provide its own Gradle/SDK configuration. Do not call Android support complete based only on the source ZIP or the version/API assumption.
 
 ## 1. Architecture
 
@@ -15,7 +15,7 @@ The only Gradle runtime archive currently at the repository root reports **Fusio
 - `android/runtime/AndroidRuntime.cpp` provides Android app-private file access, file I/O, logging and edit-data decoding. `safe_data_path()` checks paths before text I/O, encrypted direct I/O and parent-directory creation.
 - The Android build uses JNI and Java registration, **not** Clickteam's historical native `RuntimeNative.h` ABI. The project's Android compatibility declarations are not a replacement Fusion runtime or C++ SDK.
 
-`CExtLoad.java` in the exporter must register `CRunIniPlusPlus`; the extension is not loaded by a compile define alone. `tools/integrate_android_exporter.sh` copies the Java adapter and `.so` files and patches that registration only after confirming the exporter source identifies as Fusion 295.10. That successful path is not yet tested.
+`CExtLoad.java` in the generated runtime must register `CRunIniPlusPlus`; the class is not loaded by a compile define alone. `tools/package_android_extension.sh` creates a source ZIP in the Fusion merge layout (`src/Extensions/` and `assets/mmf/`). It does not contain or overwrite the proprietary loader. The optional `tools/integrate_android_exporter.sh` checks the API members and patches the extracted target project's loader without replacing the file. Whether Fusion 295.10 automatically adds this registration while merging an installed `Data/Runtime/Android/INI++.zip` still needs an export test.
 
 ## 2. ACE, edit-data and Windows compatibility
 
@@ -58,13 +58,16 @@ Java expression APIs produce `CValue` objects and the JNI bridge preserves strin
 | Check | Result |
 | --- | --- |
 | `python3 tools/gen_android_aces.py --check` | Passed locally; generated C++/Java metadata is up to date. |
-| `bash tools/run_host_tests.sh` | Passed locally with GCC 12 on the current source. Covers v1 Windows-1252 and v2 Unicode edit data, sandbox path checks, representative ACE dispatch, and the guarded no-op for an object-property ACE whose object parameter is not marshalled. |
-| `SANITIZE=1 bash tools/run_host_tests.sh` | Passed locally on the current source with AddressSanitizer + UBSan; same host-only coverage as above. |
-| `bash tools/sync_workflow.sh --check` | Passed; `.github/workflows/main.yml` matches `ci/workflows/build.yml`. |
-| NDK build of `libIniPlusPlusBridge.so` | Not run locally; no NDK installed. No Android `.so` artifact is currently verified. |
-| Java compile against Fusion 295.10 | Not run; no `javac` and no matching 295.10 exporter source in the workspace. |
-| Exporter registration/Gradle build | Not run successfully. The integration helper was run against the available 293.0 archive and correctly rejected it without changing files. |
-| Windows Runtime/Edittime MFX build | Not run in this environment; requires Windows/MSVC. |
+| `bash tools/run_host_tests.sh` | Passed locally with GCC 12 on the latest source, including C++ bridge tests and the extension ZIP layout/install smoke test. The latter uses dummy, non-runnable `.so` files. |
+| `SANITIZE=1 bash tools/run_host_tests.sh` | Passed locally with AddressSanitizer + UBSan on the latest source; same host-only coverage. |
+| Android extension ZIP smoke test | Passed locally; checks the Clickteam `src/Extensions` + `assets/mmf` paths, install destination and absence of JAR/AAR/vendor files using dummy libraries only. Not a Fusion merge test. |
+| `bash tools/sync_workflow.sh --check` | Passed locally; `.github/workflows/main.yml` matches `ci/workflows/build.yml`. |
+| Fusion 293.0 Java API source check | Passed against the available archive with `tools/integrate_android_exporter.sh --check-only` and a test-only placeholder `.so`. This is not `javac` or Gradle. |
+| CI run 38041243939 | Host tests passed; Android native build and Windows MFX jobs failed. Android SDK/NDK installation succeeded. The remaining compiler diagnostics are not available in this workspace. |
+| NDK build of `libIniPlusPlusBridge.so` | CI attempted but no passing post-fix build result is available; local NDK is absent. No verified Android `.so` artifact is established. |
+| Java compile against Fusion 295.10 | Not run; no local `javac` or 295.10 exporter source. The 293.0 API checks are not a 295.10 compile. |
+| Exporter ZIP merge/registration/Gradle build | Not validated. The `Data/Runtime/Android` source-package merge and target `CExtLoad` registration need an actual Fusion 295.10 export test. |
+| Windows Runtime/Edittime MFX build | CI attempted but latest MFX job failed; a successful post-fix run is still required. |
 | Fusion export of the Sonic MFA to an APK | Not performed. |
 | APK install and device test, including file compatibility and ACE behavior | Not performed. |
 

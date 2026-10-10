@@ -2,18 +2,17 @@
 
 Ini++ is an INI-file extension for Clickteam Fusion 2.5 / MMF2 Unicode. Its existing Windows MFX, ACE definitions, editor data, icon and Windows editor resources remain the source of truth. This branch adds an Android runtime path without changing the Windows MFX ABI.
 
-## Android status: source work, not a verified release
+## Android status: source package, not a verified release
 
-The Android implementation now uses a **Java `CRunExtension` adapter plus this project's JNI library**, which calls the shared C++ ACE implementation. It does not use or imitate Clickteam's legacy `RuntimeNative.h` ABI. The action/condition/expression parameter metadata is generated from `Menus.cpp`; host tests exercise the C++ bridge and app-sandbox file access.
+The Android implementation uses a Java `CRunExtension` adapter plus this project's JNI library, which calls the shared C++ ACE implementation. The Java sources target the Fusion 2.5 Java API surface present in the Fusion 293.0 runtime source archive; the intended deliverable is a source/ABI ZIP consumed from `<Fusion>/Data/Runtime/Android/INI++.zip` by the Fusion 295.10 exporter. The ZIP uses the runtime merge layout (`src/Extensions/` and `assets/mmf/<ABI>/`). It contains no precompiled `.class`, `.jar` or `.aar` dependency, no direct AndroidX imports, and no proprietary exporter files.
 
-Android support is **not complete or validated as a Fusion extension yet**:
+That source-compatible route is **not yet validated as a Fusion 295.10 extension**:
 
-- The requested target is Fusion 2.5 build **295.10**.
-- The repository-root `AndroidSDK_Gradle.zip` currently reports `Fusion 293.0` in `MMFRuntime.java` (Gradle 7.5, Android Gradle Plugin 7.4.2). The integration helper refuses this mismatch; it is not silently used as a 295.10 substitute and is never copied into a runtime ZIP.
-- This environment has no Java compiler, Android NDK, compatible 295.10 exporter source, or Sonic MFA/device. The NDK build, Java/Gradle compile, CExtLoad registration in build 295.10, Fusion merge/export and APK/device acceptance test have not run.
-- The current bridge preserves ACE IDs and parameter order, but it does not yet marshal Fusion object references or Ini++ custom-parameter payloads. Object-property ACEs are deliberately guarded rather than using fabricated pointers. See [Compatibility](docs/COMPATIBILITY.md).
+- The root `AndroidSDK_Gradle.zip` identifies as Fusion 293.0 (Gradle 7.5 / Android Gradle Plugin 7.4.2). It is an API reference only; it is not copied into the extension ZIP or used as the target build configuration.
+- The Fusion 295.10 merge, class registration in its `CExtLoad` flow, Java/Gradle compile, unchanged Sonic MFA export and device test have not all been completed. A source API check is not a substitute for those tests.
+- The current bridge preserves ACE IDs and parameter order, but it does not marshal Fusion object references or Ini++ custom-parameter payloads. Object-property ACEs are deliberately guarded rather than using fabricated pointers. See [Compatibility](docs/COMPATIBILITY.md).
 
-Therefore there is no complete, tested Android extension ZIP or claim that the Sonic game exports. The source-level changes and the exact remaining blockers are documented below.
+Therefore do not call Android support complete or claim the Sonic MFA exports. Keep the existing MFA events unchanged for the acceptance test, but verify all ACEs that MFA actually uses before release.
 
 ## Verification available now
 
@@ -23,7 +22,7 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The host tests cover shared ACE dispatch, current-group parameter order, UTF-8 results, numeric/packed-position values, edit-data payload handling, autosave and path traversal/symlink confinement. They do **not** compile JNI/Java or prove exporter/APK loading.
+The host tests cover shared ACE dispatch, current-group parameter order, UTF-8 results, numeric/packed-position values, edit-data payload handling, autosave and path traversal/symlink confinement. The host test runner also smoke-tests the Android extension ZIP paths and verifies it contains no `.jar`/`.aar`/`.class` or exporter archive. These checks do **not** compile JNI/Java or prove exporter/APK loading.
 
 ## Build outline
 
@@ -36,15 +35,16 @@ msbuild INI++15.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBu
 export ANDROID_NDK_HOME=/path/to/android-ndk-r26.1.10909125
 tools/build_android.sh --out build/android
 
-# This requires the exact authorized Fusion 2.5 build 295.10 Gradle exporter project.
-# It copies Java sources/libs, patches CExtLoad.java and rejects other runtime versions.
-tools/integrate_android_exporter.sh \
-  --exporter /path/to/Fusion-295.10-Gradle-project \
+# Create the Fusion Android extension ZIP and optionally install it to the Fusion Data directory.
+tools/package_android_extension.sh \
   --android-dir build/android \
-  --assemble-debug
+  --out build/android-package \
+  --install-to /path/to/Fusion/Data/Runtime/Android
 ```
 
-Exact commands, Java/Gradle version discovery, compatibility notes and limitations are in [docs/BUILD.md](docs/BUILD.md), [docs/INSTALL.md](docs/INSTALL.md), [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+The ZIP's intended name is `INI++.zip`. Fusion 295.10 still needs to merge/register/compile it using its own exporter toolchain. For direct Gradle project checks, `tools/integrate_android_exporter.sh` accepts Fusion 293.0 or 295.10 source trees only when the Java API member checks pass; the script's source checks are not a Java compile unless `--assemble-debug` is run.
+
+Exact commands, Java/Gradle toolchain boundaries, compatibility notes and limitations are in [docs/BUILD.md](docs/BUILD.md), [docs/INSTALL.md](docs/INSTALL.md), [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## Repository map
 
@@ -55,11 +55,12 @@ Exact commands, Java/Gradle version discovery, compatibility notes and limitatio
 - `android/runtime/`, `android/fusion/`: platform file/edit-data support, bridge and shared-source compatibility types.
 - `android/tests/BridgeTests.cpp`: Java/JNI-independent host tests.
 - `tools/gen_android_aces.py`: generated parameter/dispatch tables from `Menus.cpp` and `ACEs.cpp`.
-- `.github/workflows/main.yml`: CI entry point (mirrored from `ci/workflows/build.yml`); CI builds host tests, Windows MFX and Android JNI libraries, but cannot perform the user's private 295.10 exporter/Sonic APK acceptance test.
+- `tools/package_android_extension.sh`: creates and verifies the `Data/Runtime/Android` source/assets ZIP.
+- `.github/workflows/main.yml`: CI entry point (mirrored from `ci/workflows/build.yml`); CI builds host tests, Windows MFX and Android JNI libraries, but cannot run Fusion's private exporter or export/test the Sonic MFA.
 
 ## Acceptance test still required
 
-With the correct Fusion 2.5 build 295.10 exporter sources available, integrate the adapter, compile the Gradle project, install the unchanged Sonic MFA's Windows editor/runtime MFX as usual, export that normal MFA without event changes, inspect the APK's `assets/mmf/<ABI>/libIniPlusPlusBridge.so`, and run file load/save and representative ACEs on a device. Until that passes, treat Android as work in progress.
+Install the generated `INI++.zip` under Fusion's `Data/Runtime/Android`, build the unchanged Sonic MFA with Fusion 2.5 build 295.10, inspect the APK's `assets/mmf/<ABI>/libIniPlusPlusBridge.so`, and test the ACEs and sandboxed file operations the game uses on a device. Verify the target exporter's `CExtLoad` registration and Java API compatibility; unchanged Java API assumptions alone do not establish compatibility. Until this passes, treat Android as work in progress.
 
 ## History
 

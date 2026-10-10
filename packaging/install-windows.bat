@@ -5,6 +5,7 @@ rem
 rem  Copies the extension into the folders Fusion loads it from:
 rem    <Fusion>\Extensions\Unicode\INI++.mfx       (edittime: used while editing)
 rem    <Fusion>\Data\Runtime\Unicode\INI++.mfx     (runtime: used when running/building apps)
+rem    <Fusion>\Data\Runtime\Android\INI++.zip     (Android Java-source/JNI extension package, if present)
 rem
 rem  Usage:
 rem    install.bat                   detect every installed Fusion/MMF2 from the registry
@@ -29,6 +30,7 @@ goto parse
 
 set "EDITTIME_SRC=%HERE%edittime\INI++.mfx"
 set "RUNTIME_SRC=%HERE%runtime\INI++.mfx"
+set "ANDROID_SRC=%HERE%android\INI++.zip"
 
 if not exist "%EDITTIME_SRC%" (
 	echo [ERROR] %EDITTIME_SRC% is missing - extract the whole archive first.
@@ -59,7 +61,7 @@ if not defined FOUND_ANY (
 :end
 echo.
 echo Ini++ installation finished. Restart Fusion so it picks up the extension.
-echo On Android: copy INI++.zip into ^<Fusion^>\Data\Runtime\Android\ ^(see docs\INSTALL.md^).
+echo Android: when android\INI++.zip is present, this installer copies it to Data\Runtime\Android; see docs\INSTALL.md.
 if "%PAUSE_AT_END%"=="1" pause
 endlocal
 exit /b 0
@@ -95,6 +97,16 @@ echo [OK]   %LABEL%: %ROOT%
 call :copy "%EDITTIME_SRC%" "%EDIT_DIR%\INI++.mfx" "edittime" "Extensions\Unicode"
 if not exist "%RUN_DIR%\" mkdir "%RUN_DIR%" 2>nul
 call :copy "%RUNTIME_SRC%" "%RUN_DIR%\INI++.mfx" "runtime" "Data\Runtime\Unicode"
+if exist "%ANDROID_SRC%" (
+	set "ANDROID_DIR=%ROOT%\Data\Runtime\Android"
+	if not exist "!ANDROID_DIR!\" mkdir "!ANDROID_DIR!" 2>nul
+	copy /y "%ANDROID_SRC%" "!ANDROID_DIR!\INI++.zip" >nul 2>nul
+	if errorlevel 1 (
+		echo        [WARN] could not write Data\Runtime\Android\INI++.zip - run this script as administrator
+	) else (
+		echo        copied Android source/JNI ZIP to Data\Runtime\Android\INI++.zip
+	)
+)
 set "FOUND_ANY=1"
 exit /b 0
 

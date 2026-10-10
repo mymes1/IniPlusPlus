@@ -33,3 +33,5 @@ fi
     -o "$BUILD/bridge-tests" -pthread
 
 "$BUILD/bridge-tests"
+
+bash tools/test_android_package.sh
