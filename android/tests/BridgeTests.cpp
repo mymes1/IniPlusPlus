@@ -188,6 +188,13 @@ namespace
 		check(score.kind == ExpressionResult::Kind::Float && score.floating == 3.5f,
 			"numeric ACE parameters preserve the float/int selector and float result");
 
+		ipp_android::bridge::action(extension, 15,
+			std::vector<InputValue>{string("Game"), string("Decimal"), string("-12.75")});
+		auto const decimal{ipp_android::bridge::expression(extension, 8,
+			std::vector<InputValue>{string("Game"), string("Decimal"), integer(0)})};
+		check(decimal.kind == ExpressionResult::Kind::Float && decimal.floating == -12.75f,
+			"decimal INI text is parsed by the Android float-expression fallback");
+
 		constexpr std::int32_t packed_position{static_cast<std::int32_t>(((static_cast<std::uint32_t>(-200) & 0xffffu) << 16) | 345u)};
 		ipp_android::bridge::action(extension, 19, std::vector<InputValue>{
 			string("Game"), string("Spawn"), integer(packed_position)});
