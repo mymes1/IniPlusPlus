@@ -1,62 +1,67 @@
 # Ini++ (Unicode)
 
-Ini++ is an INI-file extension object for Clickteam Fusion 2.5 / Multimedia Fusion 2 (Unicode builds). It stores group/item/value data in ordinary INI files, with an undo/redo stack, escaping, encryption, autosave and a large set of actions, conditions and expressions.
+Ini++ is an INI-file extension for Clickteam Fusion 2.5 / MMF2 Unicode. Its existing Windows MFX, ACE definitions, editor data, icon and Windows editor resources remain the source of truth. This branch adds an Android runtime path without changing the Windows MFX ABI.
 
-This tree is the `unicode` branch, extended with **source for a Fusion 2.5 Android runtime port**. It is not yet a verified Android release: the native C++ build is blocked because the only Android SDK package available to the project owner is the Gradle package and it lacks Clickteam's proprietary `RuntimeNative.h`. The source-level host tests and shim-based smoke build are not a substitute for compiling against Clickteam's real ABI or exporting the Sonic MFA. See [docs/BUILD.md §2](docs/BUILD.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+## Android status: source work, not a verified release
 
-* Language: C++20, platform-neutral core
-* Windows target: Fusion 2.5 / MMF2 Unicode -> `INI++.mfx`
-* Android target (intended): Fusion 2.5 Android exporter -> `CRunINI++.so` per ABI, packaged as `INI++.zip`; blocked pending a complete compatible Clickteam C++ SDK
+The Android implementation now uses a **Java `CRunExtension` adapter plus this project's JNI library**, which calls the shared C++ ACE implementation. It does not use or imitate Clickteam's legacy `RuntimeNative.h` ABI. The action/condition/expression parameter metadata is generated from `Menus.cpp`; host tests exercise the C++ bridge and app-sandbox file access.
 
-## Documentation
+Android support is **not complete or validated as a Fusion extension yet**:
 
-| Document | Contents |
-| --- | --- |
-| [docs/BUILD.md](docs/BUILD.md) | Toolchain versions, the Clickteam Android SDK dependency, exact build commands (MSBuild / ndk-build), host tests, troubleshooting |
-| [docs/INSTALL.md](docs/INSTALL.md) | Installing and using the extension in Fusion 2.5, on Windows and on Android |
-| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | How the Android build works, what is verified and how, all platform differences and limitations |
-| [ci/workflows/build.yml](ci/workflows/build.yml) | CI workflow; `.github/workflows/main.yml` is its byte-for-byte copy. It runs ACE/host checks and builds Windows, then attempts Android only if Clickteam's compatible proprietary C++ SDK is supplied. Without the header it fails explicitly and does not produce a complete release bundle. |
+- The requested target is Fusion 2.5 build **295.10**.
+- The repository-root `AndroidSDK_Gradle.zip` currently reports `Fusion 292.0` in `MMFRuntime.java` (Gradle 4.10.1, Android Gradle Plugin 3.3.1). The integration helper refuses this mismatch; it is not silently used as a 295.10 substitute and is never copied into a runtime ZIP.
+- This environment has no Java compiler, Android NDK, compatible 295.10 exporter source, or Sonic MFA/device. The NDK build, Java/Gradle compile, CExtLoad registration in build 295.10, Fusion merge/export and APK/device acceptance test have not run.
+- The current bridge preserves ACE IDs and parameter order, but it does not yet marshal Fusion object references or Ini++ custom-parameter payloads. Object-property ACEs are deliberately guarded rather than using fabricated pointers. See [Compatibility](docs/COMPATIBILITY.md).
 
-## Layout
+Therefore there is no complete, tested Android extension ZIP or claim that the Sonic game exports. The source-level changes and the exact remaining blockers are documented below.
 
-| Path | Contents |
-| --- | --- |
-| `Runtime.cpp`, `ACEs.cpp`, `RunData.hpp`, `Settings.hpp`, `CustomParams.*`, `Menus.cpp` | The extension itself. Shared by the Windows and Android builds (`FUSION_ANDROID_RUNTIME` guards platform code). |
-| `Edittime.cpp`, `General.cpp`, `Properties.cpp`, `Extension.rc`, `Icon.bmp` | Edittime side: object registration, properties, resources (Windows editor). |
-| `lSDK/` | Submodule with the high-level SDK the extension is written against (public domain). |
-| `android/fusion/`, `android/runtime/`, `android/jni/` | Android support: Windows-API shim, platform layer + generated ACE tables, and the extension's JNI/ABI entry points with `Android.mk`/`Application.mk`. |
-| `tools/` | `gen_android_aces.py` (generates the ACE tables from `Menus.cpp`), `run_host_tests.sh`, `smoke_build_so.sh`, `build_android.sh`. |
-| `docs/` | Build, install and compatibility documentation. |
-| `packaging/` | `install-windows.bat` (installs both MFXs into a detected Fusion) and the README that goes into the release archive. |
-
-## Quick start
+## Verification available now
 
 ```sh
-git submodule update --init --recursive
-
-# host tests - no Fusion, no NDK, no Clickteam SDK needed
+python3 tools/gen_android_aces.py --check
 bash tools/run_host_tests.sh
-bash tools/smoke_build_so.sh
+SANITIZE=1 bash tools/run_host_tests.sh
+```
 
-# Windows MFX (MSVC, from a VS developer prompt; the project platform is Win32)
+The host tests cover shared ACE dispatch, current-group parameter order, UTF-8 results, numeric/packed-position values, edit-data payload handling, autosave and path traversal/symlink confinement. They do **not** compile JNI/Java or prove exporter/APK loading.
+
+## Build outline
+
+```sh
+# Windows MFX: Visual Studio 2022 / MSVC v143, Win32 developer prompt
 msbuild INI++15.vcxproj /m /p:Configuration=Runtime  /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
 msbuild INI++15.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
 
-# Android .so (BLOCKED until Clickteam supplies the compatible native C++ SDK/header;
-# the currently available Gradle archive lacks RuntimeNative.h; see docs/BUILD.md section 2)
-tools/build_android.sh --sdk-dir /path/to/authorized-native-cpp-sdk --out build/android
+# Android native/JNI half: Android NDK r26.1.10909125 (C++20, ndk-build)
+export ANDROID_NDK_HOME=/path/to/android-ndk-r26.1.10909125
+tools/build_android.sh --out build/android
 
-# the installable release for Fusion 2.5 (Windows MFX + Android package + installer + docs)
-tools/package_release.sh --windows-runtime <runtime.mfx> --windows-edittime <edittime.mfx> \
-                         --android-dir build/android --out build/release --source
+# This requires the exact authorized Fusion 2.5 build 295.10 Gradle exporter project.
+# It copies Java sources/libs, patches CExtLoad.java and rejects other runtime versions.
+tools/integrate_android_exporter.sh \
+  --exporter /path/to/Fusion-295.10-Gradle-project \
+  --android-dir build/android \
+  --assemble-debug
 ```
 
-Once the compatible Clickteam header is supplied, CI can build both runtimes and upload the complete
-`release-bundle` artifact (`IniPlusPlus-<version>.zip`). Until then, Android build/package jobs remain
-blocked; a shim-based smoke `.so` is explicitly not an Android release. The intended archive layout
-and installer are described in [docs/BUILD.md § 5.2](docs/BUILD.md) and [docs/INSTALL.md](docs/INSTALL.md).
+Exact commands, Java/Gradle version discovery, compatibility notes and limitations are in [docs/BUILD.md](docs/BUILD.md), [docs/INSTALL.md](docs/INSTALL.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+
+## Repository map
+
+- `Runtime.cpp`, `ACEs.cpp`, `RunData.hpp`, `Menus.cpp`: shared extension runtime and ACE definitions.
+- `Edittime.cpp`, `General.cpp`, `Properties.cpp`, `Extension.rc`, `Icon.bmp`: Windows editor/MFX resources; kept for existing MFAs.
+- `android/java/`: Java runtime adapter and generated ACE parameter metadata.
+- `android/jni/`: JNI bridge and NDK module setup.
+- `android/runtime/`, `android/fusion/`: platform file/edit-data support, bridge and shared-source compatibility types.
+- `android/tests/BridgeTests.cpp`: Java/JNI-independent host tests.
+- `tools/gen_android_aces.py`: generated parameter/dispatch tables from `Menus.cpp` and `ACEs.cpp`.
+- `.github/workflows/main.yml`: CI entry point (mirrored from `ci/workflows/build.yml`); CI builds host tests, Windows MFX and Android JNI libraries, but cannot perform the user's private 295.10 exporter/Sonic APK acceptance test.
+
+## Acceptance test still required
+
+With the correct Fusion 2.5 build 295.10 exporter sources available, integrate the adapter, compile the Gradle project, install the unchanged Sonic MFA's Windows editor/runtime MFX as usual, export that normal MFA without event changes, inspect the APK's `assets/mmf/<ABI>/libIniPlusPlusBridge.so`, and run file load/save and representative ACEs on a device. Until that passes, treat Android as work in progress.
 
 ## History
 
-* Original Ini++ 1.x/2.x by Jax (Jamie McLaughlin): <https://github.com/LB--/Fusion-INI-plus-plus>
-* Unicode rewrite and this fork: the `unicode` branch, maintained at <https://github.com/mymes1/IniPlusPlus>
+- Original Ini++ 1.x/2.x by Jax (Jamie McLaughlin): <https://github.com/LB--/Fusion-INI-plus-plus>
+- Unicode rewrite and this fork: <https://github.com/mymes1/IniPlusPlus>

@@ -2,38 +2,20 @@
 #define FusionAPI_HeaderPlusPlus
 
 /*
- * Ini++ Android runtime: Fusion 2.5 extension API layer.
+ * Ini++ Android source-adaptation layer for the shared Windows/MFX C++ sources.
  *
- * ================================== READ ME FIRST ==================================
+ * Windows builds use Clickteam's Windows extension SDK through lSDK. Android does not compile the
+ * MFX ABI. Instead, android/java/Extensions/CRunIniPlusPlus.java reads ACE parameters using the
+ * public Java CRunExtension API, android/jni/JniBridge.cpp translates them across JNI, and the
+ * Java-independent Bridge.cpp dispatches the existing ACE bodies. This header supplies the small
+ * Fusion/lSDK-shaped types and helpers those shared C++ files expect; it is not RuntimeNative.h,
+ * does not reproduce Clickteam's private native ABI, and is not sufficient by itself to load an
+ * extension in Fusion.
  *
- * Ini++ for Windows is built against Clickteam's Windows extension SDK through lSDK
- * (`lSDK/include/FusionAPI.hpp` and the headers in `lSDK/include/FusionAPI/`).  Those headers
- * describe Win32 structures and can only be compiled by MSVC for Windows.
- *
- * For the Android runtime this header provides the *same* names - the Fusion entry point macros,
- * the parameter accessors (`CNC_*`), the header object/run object structures, the `mv*` functions
- * and the string utilities - implemented on top of the Fusion 2.5 Android *native extension* API
- * (`RuntimeFunctions`, see android/sdk-shim/RuntimeNative.h and android/runtime).  Nothing
- * here emulates Win32 at runtime: the whole Windows API surface collapses onto
- *
- *   Windows                                          Android
- *   -----------------------------------------------------------------------------------------
- *   `param0`/`param1` + `CNC_Get*Parameter`          typed parameter reads through the frame in
- *                                                    android/runtime/AndroidRuntime.cpp, which
- *                                                    pulls values with the parameter accessors of
- *                                                    the Android SDK (`act_getParamExpString`,
- *                                                    `exp_getParamFloat`, ...)
- *   `run_data->rHo.hoFlags |= HOF_STRING/FLOAT`      inspected after the ACE body returns and
- *                                                    forwarded to `exp_setReturn*`
- *   `callRunTimeFunction(... GETSTRINGSPACE_EX)`     frame-owned return string pool
- *   `mvLoadTextFile` / `mvSaveTextFile`              app-sandbox file I/O (AndroidRuntime.cpp)
- *   `SHGetKnownFolderPath` and friends               app data directory (AndroidRuntime.cpp)
- *   `MessageBoxA`                                    Android log (`__android_log_print`/stderr)
- *
- * Everything the Windows runtime exposes that has no Android counterpart (other objects' alterable
- * values, alteration of other objects, `mvGetVersion`/`mvReAllocEditData`) is provided as a
- * no-op/compatible stub so that the shared sources compile; the ACEs that depend on it either
- * degrade to a documented no-op or are marked unsupported, see docs/COMPATIBILITY.md.
+ * The executable Android integration is Java CRunExtension + this project's JNI library. This
+ * compatibility layer owns the platform-side parameter frame, sandbox file access and edit-data
+ * decoding. Anything not represented by the current Java adapter (notably object/custom parameter
+ * payloads) must remain documented as a limitation; a host compile is not an exporter build.
  */
 
 #include "lSDK/UnicodeUtilities.hpp"
@@ -170,9 +152,9 @@ static_assert(sizeof(extHeader) == 20);
 namespace ipp_android
 {
 	[[nodiscard]] ParamFrame& current_frame() noexcept; // valid while an ACE body runs
-	// A zeroed object/custom-parameter block: the Android extension API cannot deliver Fusion
-	// object references or the payload of Ini++'s custom parameters, so ACEs that ask for one get
-	// this block (all-zero values, i.e. the documented defaults) instead of a null pointer.
+	// A zeroed object/custom-parameter block for values the current Java/JNI adapter does not yet
+	// marshal. The public Java API exposes these values, but the C++ bridge currently uses safe
+	// defaults instead of pretending to have a native Fusion C++ object.
 	[[nodiscard]] void* empty_object() noexcept;
 	void log(std::string_view text) noexcept;           // goes to the Android log/stderr
 	[[nodiscard]] std::filesystem::path data_dir();      // the app's writable sandbox directory
@@ -229,8 +211,8 @@ namespace fusion
 
 // -------------------------------------------------------------------------------------------------
 // Fusion runtime structures: only the members the shared Ini++ code actually reads are present.
-// Values for most of them are zero on Android, which disables the object-reflection features
-// (see docs/COMPATIBILITY.md) without any runtime Win32 emulation.
+// The current bridge only constructs the shared Ini++ run object; it does not yet mirror other
+// Java Fusion objects' alterable-value blocks (see docs/COMPATIBILITY.md).
 // -------------------------------------------------------------------------------------------------
 struct CValue final
 {
@@ -240,9 +222,9 @@ struct CValue final
 	union { void* m_pObject{}; };
 };
 
-// Version/build masks from the Windows SDK (Cncy.h); Ini++ uses them to pick the alterable value
-// layout of a run object. On Android there is no access to other objects' alterable values, so the
-// reflection code in ACEs.cpp is compiled but never runs (hoOEFlags is always 0).
+// Version/build masks from the Windows SDK (Cncy.h); Ini++ uses them to pick the alterable-value
+// layout when it receives a RunObject. The current Java/JNI bridge does not populate proxies for
+// other Java objects, so object-property ACEs are guarded as documented in docs/COMPATIBILITY.md.
 #define MMFVERSION_MASK 0xFFFF0000
 #define MMFBUILD_MASK   0x00000FFF
 #define MMFVERSION_20   0x02000000
@@ -405,9 +387,8 @@ inline void* callRunTimeFunction(RunData* const /*run_data*/, std::int32_t const
 }
 
 // -------------------------------------------------------------------------------------------------
-// Fusion entry point macros.  The shared sources are guarded by these; every macro present here is
-// implemented by Runtime.cpp and wired to the Android native extension API by
-// android/jni/IniPlusPlusExtension.cc.
+// Fusion entry-point feature macros. Runtime.cpp implements the shared lifecycle code; the JNI
+// library calls the same C++ lifecycle from Bridge.cpp, behind the Java CRunExtension adapter.
 // -------------------------------------------------------------------------------------------------
 #define FUSION_GET_RUNTIME_STRUCTURE_SIZE
 

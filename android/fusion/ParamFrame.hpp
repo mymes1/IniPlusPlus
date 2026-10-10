@@ -2,30 +2,17 @@
 #define IniPlusPlus_AndroidParamFrame_HeaderPlusPlus
 
 /*
- * Ini++ Android runtime: the ACE parameter frame.
+ * Android's per-ACE parameter frame for the shared C++ bodies.
  *
- * On Windows the Fusion runtime hands an extension:
- *   * the first two parameters as `param0` / `param1` (raw 32 bit values), and
- *   * a parameter cursor that `CNC_GetIntParameter`, `CNC_GetStringParameter`,
- *     `CNC_GetFloatParameter` and `CNC_GetFirst/NextExpressionParameter` read from, in the order
- *     the ACE reads them.
+ * The Java CRunExtension adapter evaluates each argument with the public CActExtension,
+ * CCndExtension or CValue API in the generated Menus.cpp order. JniBridge.cpp converts these
+ * values to InputValue and Bridge.cpp builds this frame, so the C++ ACE code can keep using the
+ * Windows-side CNC_* interface and the same ACE identifiers/order.
  *
- * The Android native extension API offers the same thing with a different spelling: the typed
- * sequential accessors act_/cnd_/exp_getParam{Expression,ExpString,ExpFloat}, each of which
- * evaluates and consumes the next parameter of the ACE currently being run.  This frame forwards
- * the shared ACE bodies' `CNC_*` reads to those accessors, so on Android the parameters are read
- * exactly when and in the order the Windows implementation reads them - including ACEs that skip a
- * parameter depending on which variant of an action they are (the "current group" actions).
- *
- * The frame also owns
- *   * the string pool that keeps strings read from the runtime alive for the duration of the ACE
- *     (the runtime's strings are returned to it with freeString as soon as they are copied), and
- *   * the return buffer used by ACEs.cpp's temp_string()/callRunTimeFunction(GETSTRINGSPACE_EX).
- *
- * Types and coercions match the Windows runtime:
- *   * reading a string parameter as a number yields 0
- *   * reading a number parameter as a string yields an empty string
- *   * HOF_STRING / HOF_FLOAT on run_data->rHo.hoFlags select what an expression returns
+ * This is a source-level adapter, not a Clickteam native ABI. Object references and Ini++ custom
+ * parameter payloads currently enter as safe placeholders; those Android differences are listed
+ * in docs/COMPATIBILITY.md. The frame owns transient strings and expression return storage for each
+ * synchronous JNI call.
  */
 
 #include <cstddef>
@@ -38,12 +25,12 @@
 
 namespace ipp_android
 {
-	// A zeroed block handed to ACEs that ask for an object or a custom parameter: the Android
-	// extension API cannot deliver either, so ACEs see all-zero values (documented defaults) instead
-	// of dereferencing a null pointer.  See docs/COMPATIBILITY.md.
+	// Safe placeholder used for object/custom parameters that this Java/JNI adapter does not yet
+	// marshal. The Java API exposes these values, but the bridge currently preserves the parameter
+	// slot with zero defaults instead of fabricating a Fusion C++ object. See docs/COMPATIBILITY.md.
 	[[nodiscard]] void* empty_object() noexcept;
 
-	// Implemented by the runtime glue (android/jni/IniPlusPlusExtension.cc) for the ACE being run.
+	// Per-call callbacks used by the bridge to consume generated expression arguments in order.
 	struct ParamSource
 	{
 		void* context{};
@@ -66,10 +53,9 @@ namespace ipp_android
 	class ParamFrame final
 	{
 	public:
-		// Conditions receive their parameters as the two raw slots param0/param1, so the runtime
-		// glue reads the declared parameter list into `params` before the ACE runs and slot()
-		// hands the values over.  Actions and expressions pull their parameters lazily through the
-		// ParamSource below, exactly when the Windows implementation would read them.
+		// The generated dispatcher reads action/condition arguments into these slots in Menus.cpp
+		// order. Expressions consume their already-evaluated arguments lazily through ParamSource,
+		// matching the shared C++ body's CNC_* call order.
 		std::vector<Param> params;
 		mutable std::size_t position{}; // cursor into `params` for CNC_* reads
 		std::int32_t ace_number{}; // becomes run_data->rHo.hoEventNumber
@@ -87,9 +73,8 @@ namespace ipp_android
 		}
 
 		// ---- CNC_* equivalents ---------------------------------------------------------------
-		// A parameter that is not available on Android (an object reference or a custom parameter
-		// payload) is the zeroed block: ACEs see all-zero values (documented defaults) instead of
-		// dereferencing a null pointer.  See docs/COMPATIBILITY.md.
+		// Object/custom values not marshalled by the current Java/JNI adapter receive a safe zeroed
+		// placeholder. ACEs retain their positions and never dereference a null pointer.
 		void* cnc_get_object() const noexcept
 		{
 			auto const* const param{peek()};
@@ -153,9 +138,8 @@ namespace ipp_android
 			return source && source->expression ? source->expression(source->context, type) : 0;
 		}
 
-		// The two raw parameters the generated dispatch passes to the ACE.  Object references and
-		// custom parameter payloads are not available through the Android extension API, so the
-		// zeroed block is handed over (documented defaults).
+		// The two raw parameters the generated dispatch passes to the ACE; un-marshalled object or
+		// custom parameters retain their index through a safe zeroed placeholder.
 		[[nodiscard]] std::intptr_t slot(std::size_t const i) const noexcept
 		{
 			if(i >= params.size())

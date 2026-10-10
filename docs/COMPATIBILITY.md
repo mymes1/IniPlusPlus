@@ -1,139 +1,71 @@
-# Ini++ on Android: architecture, compatibility and limitations
+# Ini++ Android compatibility and verification status
 
-This document describes the Android source port, its intended compatibility, and what has and has not been verified. The Windows extension is unchanged.
+## Status first
 
-> **Release status:** the Android native C++ build is currently blocked/unverified. The Gradle package
-> available to the project owner lacks Clickteam's proprietary `RuntimeNative.h`, and a complete
-> current public C++ SDK has not been verified. Host tests and the shim-based smoke build do not prove
-> exporter compatibility. Do not use this as a working Android release until a real `.so` is built
-> against Clickteam's compatible SDK and an MFA is exported/tested; see `docs/BUILD.md`, section 2.
+The Android path is an **unfinished source implementation**, not a completed Fusion extension release. The current direction is a Java `CRunExtension` adapter calling the shared C++ ACE bodies through this project's JNI library. Host C++ bridge tests pass. Java/Gradle compilation against the requested Fusion 2.5 build **295.10**, NDK compilation, Fusion `CExtLoad` registration, exporter ZIP merge, Sonic MFA APK export and a device test have not been completed.
 
----
+The only Gradle runtime archive currently at the repository root reports **Fusion 292.0** (`MMFRuntime.java`), with Gradle 4.10.1 / AGP 3.3.1. It is not the requested 295.10 exporter. The integration script fails closed on that mismatch. Do not substitute that runtime, include the proprietary ZIP in runtime artifacts, or claim Android support complete.
 
-## 1. Approach
+## 1. Architecture
 
-Ini++ is not rewritten and not re-implemented per platform: the design compiles the same `Runtime.cpp`, `ACEs.cpp` and `RunData.hpp` for Android, with three additions. This source-level architecture passes host tests, but the real NDK compile against Clickteam's exporter ABI is still blocked by the missing SDK header (section 2 of `docs/BUILD.md`):
+- `Runtime.cpp`, `ACEs.cpp`, `RunData.hpp`, `Settings.hpp` and the `Menus.cpp` ACE declarations are shared with the Windows MFX.
+- `android/java/Extensions/CRunIniPlusPlus.java` implements the Java `CRunExtension` surface. It reads action/condition/expression parameters with the Java runtime's typed APIs and holds the object lifecycle.
+- `android/jni/JniBridge.cpp` converts Java values to UTF-8/bridge input and returns `Expressions.CValue` results.
+- `android/runtime/Bridge.cpp` owns the shared C++ run object and dispatches the existing ACE functions. `tools/gen_android_aces.py` derives the ordered Java/C++ parameter tables from `Menus.cpp` and the shared ACE tables.
+- `android/runtime/AndroidRuntime.cpp` provides Android app-private file access, file I/O, logging and edit-data decoding. `safe_data_path()` checks paths before text I/O, encrypted direct I/O and parent-directory creation.
+- The Android build uses JNI and Java registration, **not** Clickteam's historical native `RuntimeNative.h` ABI. The project's Android compatibility declarations are not a replacement Fusion runtime or C++ SDK.
 
-1. **`android/fusion/` - a compile-time shim for the Windows build environment.** The shared sources include `<Windows.h>`, `<Shlobj.h>`, `lSDK.hpp` and the Fusion API headers, and call `mv*`/`CNC_*`/`callRunTimeFunction`. On Android these resolve to `android/fusion/FusionAPI.hpp` (types, constants, struct layouts taken from the Windows SDK headers so the shared code compiles unchanged), `ParamFrame.hpp` (the ACE parameter frame), and small stand-ins for the rest. Platform behaviour is behind `#ifdef FUSION_ANDROID_RUNTIME`; there is no `#ifdef` in any ACE body.
-2. **`android/runtime/AndroidRuntime.cpp` - the Android platform layer:** the application's writable data directory, UTF-8 file I/O with the same BOM/encoding handling as Windows, logging, and `SerializedEditData::deserialize()` with the byte layout the Windows editor writes (v1 ANSI and v2 UTF-16), including the same "unknown version → defaults" behaviour (a log line instead of a message box).
-3. **`android/jni/IniPlusPlusExtension.cc` + `android/runtime/AceDispatch.inc`** - the extension side of the official Android native extension ABI described by the Clickteam Android SDK (`RuntimeFunctions`, `extInit`/`createRunObject`/`getNumberOfConditions`/`destroyRunObject`/`handleRunObject`/`action`/`condition`/`expression`). The dispatch table is **generated from `Menus.cpp`** (`tools/gen_android_aces.py`), so parameter lists, types and their order are the same data the editor and the Windows runtime use, and the generator fails the build if `Menus.cpp`'s ACE lists and `ACEs.cpp`'s tables ever disagree.
+`CExtLoad.java` in the exporter must register `CRunIniPlusPlus`; the extension is not loaded by a compile define alone. `tools/integrate_android_exporter.sh` copies the Java adapter and `.so` files and patches that registration only after confirming the exporter source identifies as Fusion 295.10. That successful path is not yet tested.
 
-The intended consequence, once the real ABI build is available and verified, is that the ACE surface,
-parameter order, editing experience, object identifier (`0x12FD53A0`), OEFLAGS, icon and editor
-resources match Windows; the MFA should not need event edits. This compatibility is a source-level
-design goal, not yet validated by a real exporter build.
+## 2. ACE, edit-data and Windows compatibility
 
-### 1.1 Parameter passing
+The generated table currently contains **84 actions, 20 conditions and 41 expressions**, matching the checked-in `Menus.cpp` / `ACEs.cpp` declarations and order. The host test covers representative string/number/condition/current-group/position dispatch. Run `python3 tools/gen_android_aces.py --check` after ACE edits.
 
-| | Windows | Android |
-| --- | --- | --- |
-| Actions/Conditions (first two parameters) | `param0`/`param1` passed to the function | Condition parameters are read up front and handed over the same way; action parameters are read through the runtime's typed accessors (see below) and the same slots are used where an ACE reads `param0`/`param1` directly |
-| Parameters read inside the ACE | `CNC_GetIntParameter` / `CNC_GetStringParameter` / `CNC_GetFloatParameter` cursor | the same `CNC_*` calls, forwarded to the Android runtime's `act_/cnd_/exp_getParam{Expression,ExpString,ExpFloat}` accessors, which advance exactly like the Windows cursor |
-| Expressions | `CNC_GetFirst/NextExpressionParameter` with `TYPE_INT`/`TYPE_STRING`/`TYPE_FLOAT` | the same calls, forwarded to the runtime's accessors (the Android API evaluates and consumes one parameter per call, like the Windows runtime) |
-| Expression return | `HOF_STRING` → returned string pointer; `HOF_FLOAT` → float bit pattern in an int32; otherwise an integer | identical |
+The Windows MFX project, Windows editor files, icon, object identifier and resource strings are kept in the tree; Android changes use separate Java/JNI/platform sources and `FUSION_ANDROID_RUNTIME` guards. The Windows MFX has **not** been built in this continuation, so Windows non-regression is not yet established by a build result.
 
-This is why the "current group" variants of ACEs that read different parameters depending on which variant is called (e.g. `Set value` vs `Set value (current group)`, `Get item value` vs `Get item value (current group)`) behave correctly rather than reading the wrong parameter.
+The Android deserializer retains the shared v1 ANSI and v2 Unicode edit-data format. The bridge accepts either a full `extHeader`-prefixed blob or a payload-only byte array. The current host tests cover payload-only v1 ANSI data (Windows-1252) and v2 Unicode data; the target runtime's precise pointer convention still needs a compatible 295.10 exporter test. Do not infer successful MFA object-data loading from the host test alone.
 
----
+## 3. Known Android behavior differences
 
-## 2. Verified, and how
+### 3.1 Object references and custom parameters
 
-| What | How it is verified | Status |
-| --- | --- | --- |
-| The shared sources compile in the host-test configuration | `g++ -std=c++20 -DFUSION_ANDROID_RUNTIME ...` over `Runtime.cpp`/`ACEs.cpp` with test platform definitions (also part of `tools/run_host_tests.sh`) | verified locally (GCC 12); **not an NDK/exporter build** |
-| The ACE tables match `Menus.cpp`/`ACEs.cpp` (all 145 ACEs, same ids, same parameter order) | `python3 tools/gen_android_aces.py --check` (CI job `ace-tables`) | verified |
-| Behaviour through the Android entry points: object creation from Windows-format edit data, groups/items, numbers and strings, `Set value (current group)`, `New`, `Load`, `Save as`, autosave via `handleRunObject`, expression returns, conditions | `tools/run_host_tests.sh` - 34 checks driving `CRunINI++_createRunObject/action/condition/expression/handleRunObject` through a mock of the Android runtime, including files written as UTF-16 and as Windows-1252 (CI job `host-tests`) | verified locally (GCC 12) |
-| The extension is a loadable shared object exporting the exact entry points the runtime looks up (`CRunINI++_*` and `CRunIniPlusPlus_*`) | `tools/smoke_build_so.sh`: builds the `.so`, checks `nm -D`, then `dlopen`s it and resolves all 16 entry points with `dlsym` | verified locally |
-| The Windows MFX still builds and exports its entry points | CI job `windows-extension` (MSVC v143, `Runtime`/`Edittime` Win32) | requires CI (needs MSVC) |
-| The Android `.so` builds with the NDK against the real `<RuntimeNative.h>` | CI job `android-extension` (`ci/workflows/build.yml`) | **blocked/unverified**: the Gradle archive checked for this project lacks the header; no complete current public C++ SDK has been verified (see `docs/BUILD.md`, section 2) |
-| Behaviour on a real device / with the real runtime | Build an APK from an MFA that uses `INI++.mfx` with the exporter and run it | **not yet performed** - see section 4 |
-| Windows behaviour is unaffected by the Android work | All changes to the shared sources are either Android-only (`#ifdef FUSION_ANDROID_RUNTIME`) or platform-neutral (`std::to_wstring` → `lSDK::string_t_from_numeric`, which is `std::to_wstring` on Windows); the Windows files, project file, resources and ACE tables are otherwise untouched | reviewed; Windows build runs in CI |
+The Java runtime APIs expose object/custom parameter accessors, but this adapter currently maps those parameter kinds to safe placeholders instead of marshalling Java objects and `PARAM_EXTBASE` payloads into the C++ bridge. The parameter indexes/ACE declarations stay present, but some behavior does not match Windows:
 
----
+- The four `Save/Load object properties` ACEs (with and without group variants) are guarded as no-ops on Android. They do not save or mutate a placeholder's zero values.
+- ACEs that use Ini++ custom parameter payloads receive zero/default placeholders.
+- Other ACEs that depend on these values must be identified during project testing; do not assume every event in every existing MFA behaves identically on Android.
 
-## 3. Differences and limitations
+This is an active compatibility gap and could require event changes in projects that use these features. It must be closed or explicitly accepted after testing the Sonic MFA before claiming the user's normal-MFA/no-event-change acceptance criterion.
 
-### 3.1 ACEs that are not implemented (on both platforms)
+### 3.2 Existing unimplemented ACE bodies
 
-69 of the 145 ACEs have an implementation; the other 76 are stubs in `ACEs.cpp` (`NOT_YET_IMPLEMENTED`) and have never worked in this fork - on Windows they show an "unimplemented" message box, on Android they log
+Several ACE implementations in this fork are already marked `NOT_YET_IMPLEMENTED` in shared `ACEs.cpp` and are not functional on Windows either. Android preserves their IDs and menu/parameter definitions; it does not add missing semantics. Use `python3 tools/gen_android_aces.py --report` to inspect the declaration/implementation status.
 
-```
-Ini++ (Android): ACE not implemented: <function name>
-```
+### 3.3 Numbers and strings
 
-once per ACE and do nothing. They are still registered, still have their menus and their parameters, so an MFA that uses them keeps loading. The list (`tools/gen_android_aces.py --report`):
+Java expression APIs produce `CValue` objects and the JNI bridge preserves string values as UTF-8. The shared Fusion ACE code returns its float expression values through a 32-bit float representation to match the existing Windows extension interface, so decimal precision is limited to float precision for those values. Integer and string paths have separate typed marshalling.
 
-**Actions (54):** `Set string (MD5) (current group)`, `Save globals`, `Load globals`, `Rename group (current group)`, `Rename item (current group)`, `Move item to group (current group)`, `Set string (MD5)`, `Save alterable values`, `Load alterable values`, `Rename group`, `Rename item`, `Move item`, `Move item to group`, `Copy item`, `Delete item (everywhere)`, `Perform search`, `Perform multiple search`, `Clear results`, `Create sub-INI`, `Create sub-INI from object`, `Merge file`, `Merge group file`, `Merge`, `Merge group from object`, `Backup to`, `Set compression`, `Set read only`, `Set case sensitive`, `Set escape characters`, `Never quote strings`, `Set repeat modes`, `Set newline character`, `Set default directory`, `Compress file`, `Decompress file`, `Open dialog`, `Add repeated item`, `Close dialog`, `Refresh dialog`, `Export CSV`, `Import CSV`, `To chart`, `Find sub-groups`, `Enable sub-groups`, `SSS`, `Set item array`, `Load from array`, `Save to array`, `From chart`, `Save chart settings`, `Load chart settings`, `Clear undo stack`, `Add new undo block`, `Set manual mode`.
+### 3.4 File paths and storage
 
-**Conditions (3):** `Compare MD5`, `Compare MD5 (current group)`, `Wildcard match`.
+- Android file access is rooted at the app's private `Context.getFilesDir()` directory.
+- Relative paths resolve beneath that root. Legacy Windows-drive paths (for example `C:\Sonic\Game.ini`) have the drive prefix removed and map beneath `filesDir`.
+- Traversal (`..`), external absolute paths and symlink escapes outside the sandbox are refused before loading/saving, encrypted direct file I/O or directory creation.
+- This does not reproduce arbitrary Windows filesystem access. Android scoped/private storage differences apply.
+- Existing INI content, UTF-8 text and the shared encryption implementation are retained in the C++ core; device-level cross-platform save/load still needs testing.
 
-**Expressions (19):** `Search result count`, `Search result group`, `Search result item name`, `Search result item value`, `Search result item string`, `Search result path`, `Hash string`, `Encrypt string`, `Escape string`, `Unescape string`, `Inner product`, `Inner product (string)`, `Nth sorted name`, `Nth sorted value`, `CSV`, `Nth item (everywhere)`, `Unique item names`, `Item array`, `Current group (string)`.
+## 4. Evidence matrix
 
-Everything else works: `Set/Get value`, `Set/Get string`, the current-group variants, groups (exists/has item/item count/group count/total items/nth group/nth item/position), `New`, `Load file`, `Save`, `Save as`, `Close`, `Load from string`, `Auto save`, `Set read only`, `Undo`/`Redo` conditions (`Has undo`, `Has redo`), `Stringify`, `Empty`, `Item exists`, `Group exists`, `File name`, `Get part in string`, `Escape`/`Unescape`, `Fusion version` (`Get fusion version`), and the `On ...` event conditions, which return true when the runtime evaluates them - the shared implementation never triggered them on Windows either (nothing calls the runtime's generate-event function), so Android matches Windows here. If those events should be made to work, the Android side has `RuntimeFunctions::generateEvent` available.
+| Check | Result |
+| --- | --- |
+| `python3 tools/gen_android_aces.py --check` | Passed locally; generated C++/Java metadata is up to date. |
+| `bash tools/run_host_tests.sh` | Passed locally with GCC 12 on the current source. Covers v1 Windows-1252 and v2 Unicode edit data, sandbox path checks, representative ACE dispatch, and the guarded no-op for an object-property ACE whose object parameter is not marshalled. |
+| `SANITIZE=1 bash tools/run_host_tests.sh` | Passed locally on the current source with AddressSanitizer + UBSan; same host-only coverage as above. |
+| `bash tools/sync_workflow.sh --check` | Passed; `.github/workflows/main.yml` matches `ci/workflows/build.yml`. |
+| NDK build of `libIniPlusPlusBridge.so` | Not run locally; no NDK installed. No Android `.so` artifact is currently verified. |
+| Java compile against Fusion 295.10 | Not run; no `javac` and no matching 295.10 exporter source in the workspace. |
+| Exporter registration/Gradle build | Not run successfully. The integration helper was run against the available 292.0 archive and correctly rejected it without changing files. |
+| Windows Runtime/Edittime MFX build | Not run in this environment; requires Windows/MSVC. |
+| Fusion export of the Sonic MFA to an APK | Not performed. |
+| APK install and device test, including file compatibility and ACE behavior | Not performed. |
 
-### 3.2 Object / alterable-value ACEs
-
-The four "Save/Load object properties" actions (menu: `Save object properties`,
-`Load object properties`, with their "in group" variants) read and write **another object's**
-position, movement, alterable values, strings and flags. The Android native extension API provides
-no access to other objects at all, so on Android these four ACEs log
-
-```
-Ini++ (Android): this ACE needs another object, which the Android extension API cannot provide: actionSaveObject
-```
-
-and return without touching the file or the object. They deliberately do **not** fall back to the
-zeroed placeholder's values: that would overwrite existing data (e.g. `posx`/`posy` = 0) with
-garbage. Nothing is ever dereferenced, so the ACEs are safe to leave in the events; they just do
-nothing, which is the closest compatible behaviour available.
-
-To keep a project working on Android, replace them with explicit writes/reads of the values you want
-to persist, e.g. `Set value "posx" = X of Sonic`, `Set value "posy" = Y of Sonic`,
-`Set value "rings" = ...`, and read them back with the normal get-value expressions. The four
-Windows-only helpers `Save/Load alterable values` are already stubs on both platforms (section 3.1).
-
-The serialized key format (`val###`/`str###`/`posx`/`posy`/`dir`/`spd`/`ani`/`frame`/`flags`) is
-unchanged, so files written by the object ACEs on Windows are readable on Android through the
-ordinary get-value/get-string expressions.
-
-### 3.3 Custom parameters
-
-Ini++ has ACEs with its own custom parameters (`Ini++ parameter: ...`). The Android extension API delivers no payload for them; such a parameter arrives as all-zero data (documented defaults) instead of the value chosen in the MFA. ACEs that use custom parameters for behaviour therefore behave like the "zero/default" case on Android. Check your events for "Ini++ parameter" entries if an ACE behaves unexpectedly.
-
-### 3.4 Numeric precision
-
-Fusion expressions are 64-bit doubles; the Android extension API hands extension code **32-bit floats** (`act/cnd/exp_getParamExpFloat`) and takes them back the same way (`exp_setReturnFloat`). Core arithmetic and comparisons of ordinary INI values are unaffected, but:
-
-* a value written from an expression keeps ~7 significant digits instead of ~15 (e.g. `Set value` from an expression with a very precise decimal number),
-* integers beyond 2^24 (16,777,216) can lose precision when they pass through an *expression parameter*. Values written through integer parameters (the usual case) keep the full 32-bit range.
-
-Strings are unaffected: reads and writes are UTF-8 end to end.
-
-### 3.5 Files and paths
-
-* Relative names resolve against the application's private data directory (the same directory Fusion's own file object uses); absolute paths are used as given and follow Android's storage rules for the app.
-* No `\\?\` long-path handling (a Windows-only workaround) - Android paths have no such prefix and the code path is skipped.
-* The extension creates missing parent folders on save when "Can create folders" is enabled, as on Windows.
-* INI files are byte-compatible with Windows in both directions: UTF-8 (with or without BOM) is Ini++'s format; UTF-16 LE/BE files written on Windows are converted on load; a file that is not valid UTF-8 (i.e. an ANSI/Windows-1252 file written by a Windows tool) is decoded as Windows-1252, which is what the Windows runtime does through the application's code page; escaped characters (`\\`, `\q`, `\=`, tabs, newlines, leading/trailing spaces) use the same escaping rules.
-* Encrypted files (the `Encrypt` property) use the same Thayer cipher and stay readable on both platforms.
-
-### 3.6 Edit data (object properties)
-
-The blob the Windows editor writes is read on Android with the identical layout: v2 (Unicode, NUL-terminated UTF-16 strings) and v1 (the original ANSI version, fixed-size arrays, code page 1252). An unknown/garbled version logs and falls back to the object's default properties instead of showing a message box. Because the Android loader's pointer convention is not publicly documented, the extension accepts both a blob that starts with the extension header (`extHeader`) and a payload-only pointer by sanity-checking the header; both forms are covered by the host tests for the first form, and the second is a defensive fallback.
-
-### 3.7 Lifecycle details
-
-* `handleRunObject` (called every tick by the runtime) performs the same autosave decision as Windows.
-* On destruction the object is destroyed with `fast = false`, so a pending autosave is written, like the Windows runtime does.
-* `DisplayRunObject`, `PauseRunObject` etc. are not needed: the object is invisible on both platforms (OEFLAGS do not include drawing).
-
----
-
-## 4. What is *not* verified yet
-
-1. **A run on a real Android device / with the real Clickteam runtime.** The CI and host tests exercise the extension through the same entry points and parameter accessors, but the actual `RuntimeFunctions` implementation is proprietary and only exists inside the exporter's runtime. Two things can only be checked there: that the runtime resolves the `CRunINI++_*` symbols of the shipped `.so` (the smoke build proves the symbols exist and are resolvable by a dynamic loader), and which edit-data pointer convention this exporter version uses (both are handled).
-2. **The APK packaging path.** The `INI++.zip` layout follows the Android SDK's documented extension package layout (`assets/mmf/<abi>/CRun<Name>.so`, `Data/Runtime/Android/<Name>.zip`), which is what the public SDK and its `tools/install-native` script use; a current exporter build should be checked by unzipping the APK as described in `docs/INSTALL.md` §2.3.
-3. **Float precision differences** in the MFA-specific paths (§3.4) - by construction, not by test.
-4. **The Windows MFX** builds in CI, but checking that Fusion can actually load it requires Windows with Fusion installed.
-
-If any of these fail on a real setup, the failure modes are explicit (missing export → `dlopen`/`dlsym` error in logcat; wrong edit data → the "does not start with an Ini++ object header" log line; missing ACE → the "unknown <kind> id" log line), so the cause is identifiable from logcat.
+A passing host test is evidence for the paths it exercises, not evidence of an Android APK or a real Fusion exporter integration.

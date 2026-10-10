@@ -7,7 +7,7 @@
 //   * the parameter list (types and order) taken from Menus.cpp, and
 //   * a dispatch case that reads those parameters in that order and calls the ACE body.
 
-// This file is included from inside namespace ipp_android (see IniPlusPlusExtension.cc).
+// This file is included from inside namespace ipp_android (see Bridge.cpp).
 inline ::fusion::action_return_t dispatch_action(std::int32_t const num, ::RunData* const run_data,
 	ParamFrame& frame, [[maybe_unused]] AceParamReader& reader) noexcept
 	{
@@ -47,7 +47,7 @@ inline ::fusion::action_return_t dispatch_action(std::int32_t const num, ::RunDa
 				return actionLoadObjectG(run_data, frame.slot(0), frame.slot(1));
 			case 6: // actionSavePositionG
 				reader.add_string(frame.params);
-				reader.add_number(frame.params);
+				reader.add_position(frame.params);
 				run_data->rHo.hoEventNumber = frame.ace_number = 6;
 				return actionSavePositionG(run_data, frame.slot(0), frame.slot(1));
 			case 7: // actionSaveGlobalValuesG
@@ -114,7 +114,7 @@ inline ::fusion::action_return_t dispatch_action(std::int32_t const num, ::RunDa
 			case 19: // actionSavePosition
 				reader.add_string(frame.params);
 				reader.add_string(frame.params);
-				reader.add_number(frame.params);
+				reader.add_position(frame.params);
 				run_data->rHo.hoEventNumber = frame.ace_number = 19;
 				return actionSavePosition(run_data, frame.slot(0), frame.slot(1));
 			case 20: // actionSaveAltValues

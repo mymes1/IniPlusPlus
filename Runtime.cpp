@@ -1,6 +1,9 @@
 #include "FusionAPI.hpp"
 #include "EditData.hpp"
 #include "RunData.hpp"
+#ifdef FUSION_ANDROID_RUNTIME
+#include "AndroidRuntime.hpp"
+#endif
 
 #include <array>
 #include <filesystem>
@@ -58,6 +61,14 @@ enum struct DefaultFolderProp
 };
 [[nodiscard]] std::filesystem::path get_default_path(std::int32_t const type, RunHeader const& rh)
 {
+#ifdef FUSION_ANDROID_RUNTIME
+	// Android has no Windows, roaming AppData, or app-install folders. Fusion's Java runtime
+	// supplies Context.getFilesDir() to the JNI bridge, so every editor folder choice resolves
+	// inside this application's writable private sandbox.
+	static_cast<void>(type);
+	static_cast<void>(rh);
+	return ipp_android::data_dir();
+#else
 	switch(DefaultFolderProp{type})
 	{
 		case DefaultFolderProp::Windows: return get_known_folder(::FOLDERID_Windows);
@@ -80,6 +91,7 @@ enum struct DefaultFolderProp
 		default: break;
 	}
 	return longify_path(std::filesystem::current_path());
+#endif
 }
 
 static auto load_text_file(RunData const* const run_data, lSDK::char_t const* const filename) noexcept
@@ -499,9 +511,19 @@ void Data::load(lSDK::string_view_t s)
 }
 void Data::load(RunData const* const run_data, std::filesystem::path const& file_path)
 {
+#ifdef FUSION_ANDROID_RUNTIME
+	auto const safe_path{ipp_android::safe_data_path(file_path)};
+	if(!safe_path)
+	{
+		return;
+	}
+	std::filesystem::path const& resolved_path{*safe_path};
+#else
+	std::filesystem::path const& resolved_path{file_path};
+#endif
 	if(settings.encrypt_key)
 	{
-		if(std::ifstream ifs{file_path, std::ios::binary})
+		if(std::ifstream ifs{resolved_path, std::ios::binary})
 		if(ifs.seekg({}, std::ios::end))
 		if(auto const end_pos{ifs.tellg()}; end_pos > 0)
 		if(auto ini_data{std::string(static_cast<std::size_t>(end_pos), '\0')}
@@ -526,14 +548,14 @@ void Data::load(RunData const* const run_data, std::filesystem::path const& file
 		else assert(false);
 	}
 #ifdef FUSION_ANDROID_RUNTIME
-	else if(auto const ini_unicode{load_text_file(run_data, file_path.string().c_str())})
+	else if(auto const ini_unicode{load_text_file(run_data, resolved_path.string().c_str())})
 #else
-	else if(auto const ini_unicode{load_text_file(run_data, file_path.wstring().c_str())})
+	else if(auto const ini_unicode{load_text_file(run_data, resolved_path.wstring().c_str())})
 #endif
 	{
 		return load(lSDK::string_view_t{ini_unicode.get()});
 	}
-	else assert(!exists(file_path));
+	else assert(!exists(resolved_path));
 }
 static auto split(lSDK::string_view_t s, lSDK::string_view_t const by)
 {
@@ -656,24 +678,34 @@ lSDK::string_t Data::stringify() const
 }
 void Data::save(RunData const* const run_data, std::filesystem::path const& file_path) const
 {
+#ifdef FUSION_ANDROID_RUNTIME
+	auto const safe_path{ipp_android::safe_data_path(file_path)};
+	if(!safe_path)
+	{
+		return;
+	}
+	std::filesystem::path const& resolved_path{*safe_path};
+#else
+	std::filesystem::path const& resolved_path{file_path};
+#endif
 	if(run_data->settings->auto_create_dirs)
 	{
 		std::error_code ec{};
-		create_directories(file_path.parent_path(), ec);
+		create_directories(resolved_path.parent_path(), ec);
 		std::ignore = ec;
 	}
 	if(settings.encrypt_key)
 	{
 		auto ini_data{lSDK::narrow_from_wide(stringify())};
 		toggle_encryption(ini_data, *settings.encrypt_key);
-		std::ignore = std::ofstream(file_path, std::ios::binary).write(std::data(ini_data), std::size(ini_data));
+		std::ignore = std::ofstream(resolved_path, std::ios::binary).write(std::data(ini_data), std::size(ini_data));
 	}
 	else
 	{
 #ifdef FUSION_ANDROID_RUNTIME
-		std::ignore = save_text_file(run_data, file_path.string().c_str(), stringify().c_str());
+		std::ignore = save_text_file(run_data, resolved_path.string().c_str(), stringify().c_str());
 #else
-		std::ignore = save_text_file(run_data, file_path.wstring().c_str(), stringify().c_str());
+		std::ignore = save_text_file(run_data, resolved_path.wstring().c_str(), stringify().c_str());
 #endif
 	}
 }

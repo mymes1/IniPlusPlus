@@ -1,112 +1,61 @@
 # Installing and using Ini++
 
-Two installation layouts are documented, depending on where the app runs. Windows installation is supported by the MFX artifacts. **Android installation is conditional and is not yet a verified release**: the C++ build is blocked pending a complete compatible Clickteam native SDK/header (see `docs/BUILD.md`, section 2). The intended Android package preserves the object/ACE surface and MFA data; do not treat it as working in an APK until the real `.so` is built and the user's MFA is tested.
+## Windows / editor
 
-## 0. From a packaged release (recommended)
+Install the matching Windows MFX pair under your Fusion 2.5 Unicode installation:
 
-When CI has produced a complete `release-bundle` (which is **blocked** until the Clickteam Android
-C++ SDK/header is supplied), download `IniPlusPlus-<version>.zip` and extract it **completely** - the
-installer needs the folders next to it. A stand-in/smoke build is not a distributable Android package.
-Then:
+- Edittime MFX: `<Fusion 2.5>/Extensions/Unicode/INI++.mfx`
+- Runtime MFX: `<Fusion 2.5>/Data/Runtime/Unicode/INI++.mfx`
 
-* **Windows:** run `windows\install.bat`. It finds Fusion 2.5 Developer/Standard and MMF2
-  Developer/Standard in the registry and copies both MFXs into place (sections 1 below, if you
-  prefer doing it by hand or the detection fails - e.g. portable installs, where you pass the folder:
-  `windows\install.bat "D:\Fusion 2.5"`).
-* **Android (only after a verified release exists):** copy `android\INI++.zip` into `<Fusion>\Data\Runtime\Android\` (section 2).
-* The archive also contains `docs\` and, when packaged with `--source`, the sources.
+The Windows editor resources, icon, ACE definitions/order and serialized object data remain in the existing Windows project. Existing MFAs should continue to resolve the same extension; the MFX rebuild still needs to be run to establish non-regression for the current branch.
 
-| | Windows build | Android build |
-| --- | --- | --- |
-| File to install | `INI++.mfx` (runtime) and `INI++_edittime.mfx` (edittime) | `INI++.zip` (`assets/mmf/<abi>/CRunINI++.so`) |
-| Where it goes | into Fusion's extension folder / the app's data folder | into Fusion's `Data/Runtime/Android/` folder, merged into the APK by the Android exporter |
-| Editor | Fusion 2.5 (Unicode) or MMF2 (Unicode) | Fusion 2.5 with the Android exporter; the MFA is still edited on Windows |
+You can use `packaging/install-windows.bat` with the two built MFX files, or copy them manually. See [BUILD.md](BUILD.md) for the Visual Studio/MSBuild commands.
 
----
+## Android: not a verified install yet
 
-## 1. Windows (Fusion 2.5 / MMF2 Developer, Unicode)
+There is currently **no tested Android release ZIP**. The target is Fusion 2.5 build **295.10**, but the repository-root `AndroidSDK_Gradle.zip` identifies itself as Fusion 292.0. The integration helper refuses that mismatch. No build-295.10 Java/Gradle compile, exporter merge, Sonic MFA APK, or device test has been completed. Do not treat a source-only archive as a working extension.
 
-1. Close Fusion.
-2. Install the **edittime** MFX (the one built with `Edittime|Win32`, `INI++_edittime.mfx` in the CI artifacts) as `INI++.mfx` in the extension folder, so the editor can use the object:
-   * Fusion 2.5: `<Fusion install>\Extensions\Unicode\INI++.mfx`
-   * MMF2 Developer: `<MMF2 install>\Extensions\Unicode\INI++.mfx`
-3. Install the **runtime** MFX (built with `Runtime|Win32`, `INI++.mfx` in the CI artifacts) as `INI++.mfx` in the runtime folder, so running and building applications works:
-   * Fusion 2.5: `<Fusion install>\Data\Runtime\Unicode\INI++.mfx`
-   * (Fusion copies that folder's extensions into the applications it builds.)
-4. Start Fusion and open an MFA. The object appears in the object list as **Ini++** (Unicode).
-4. Existing MFAs that already use Ini++ keep working: the edit data (properties) is read in the same format (`INI++` version 2 / Unicode) and older ANSI (version 1) data is still understood.
+The intended path is a reusable runtime integration, so a normal MFA should need no event changes once the Java adapter is compatible and installed. However, the current bridge does not marshal object references or Ini++ custom-parameter payloads, and four object-property ACEs are guarded as no-ops. That gap must be resolved or accepted for the particular MFA before the no-event-change criterion can be claimed; see [COMPATIBILITY.md](COMPATIBILITY.md).
 
-Both files must be named `INI++.mfx`; Fusion matches the edittime and runtime MFX by file name. If only the edittime MFX is installed, MFAs load but applications report a missing extension at run time, and vice versa.
+### Build/integrate with the exact exporter
 
----
+1. Obtain the authorized Fusion 2.5 build 295.10 Gradle exporter project and its documented Java/Gradle/Android SDK tool versions. Do not use the repository's 292.0 archive as a substitute.
+2. Build the JNI library using Android NDK `26.1.10909125`:
 
-## 2. Android (Fusion 2.5 + Android exporter)
-
-> **Not currently verified:** these installation steps apply only after a genuine `INI++.zip` with
-> `.so` files built against a complete compatible Clickteam C++ SDK has been produced. The currently
-> available Gradle package lacks `RuntimeNative.h`; this branch has not exported the Sonic MFA to APK.
-
-### 2.1 Prepare the exporter
-
-Follow Clickteam's Android exporter setup (the extension adds nothing to it). In short, the machine needs:
-
-* Fusion 2.5 with the **Android exporter** installed,
-* **JDK 11** (Java 17+ is not supported by the exporter's Gradle/AGP combination),
-* Android **SDK Platform API 34** and **Build-Tools 34.x**,
-* the **Android NDK** that the exporter expects (the extension itself is built with NDK r23+, see `docs/BUILD.md`),
-* Gradle (shipped with the exporter) and a device/emulator with developer mode.
-
-### 2.2 Install the extension package
-
-1. Close Fusion.
-2. Copy `INI++.zip` into the Android exporter's runtime-extension folder:
-   `<Fusion install>\Data\Runtime\Android\INI++.zip`
-   (that folder is where Fusion looks for Android extensions; each ZIP is merged into the runtime project before the APK is built).
-3. The ZIP contains one file per ABI:
+   ```sh
+   export ANDROID_NDK_HOME=/path/to/android-ndk-r26.1.10909125
+   tools/build_android.sh --out build/android
    ```
-   assets/mmf/arm64-v8a/CRunINI++.so
-   assets/mmf/armeabi-v7a/CRunINI++.so
-   assets/mmf/x86_64/CRunINI++.so
+
+3. Check and integrate the Java adapter into the exact exporter source tree:
+
+   ```sh
+   tools/integrate_android_exporter.sh \
+     --exporter /path/to/Fusion-295.10-Gradle-project \
+     --android-dir build/android \
+     --check-only
+
+   tools/integrate_android_exporter.sh \
+     --exporter /path/to/Fusion-295.10-Gradle-project \
+     --android-dir build/android \
+     --assemble-debug
    ```
-   If you build the extension yourself, use the layout from `tools/build_android.sh` / the artifacts of the CI workflow (`.github/workflows/main.yml`).
-4. Start Fusion, open the MFA and build an Android application as usual.
 
-### 2.3 Verify the installation
+   The helper copies `CRunIniPlusPlus.java` and the generated ACE parameter table, copies `libIniPlusPlusBridge.so` under `app/src/main/assets/mmf/<ABI>/`, and adds explicit `CExtLoad.java` registration. Existing differing files are not overwritten. A successful Gradle build proves compilation only; it does not test an MFA export or device.
 
-After the first APK build, unzip it (APKs are ZIP files) and check:
+4. Use Fusion 2.5 build 295.10 to export the user's normal Sonic MFA with the Android exporter. Do not edit its Fusion events for this acceptance test. Select ABI(s) matching the device and follow the exporter project's signing/export procedure.
+5. Inspect the APK contents to confirm the native library is present for the device ABI and install it on a device. Test a representative group/item/string/numeric/position ACE path, file load/save/autosave inside the app data directory, and every object/custom-parameter feature the MFA uses. Check `adb logcat -s IniPlusPlus` for JNI, CExtLoad or sandbox-path errors.
+6. Compare the exported APK/runtime behavior against the existing Windows build and record the exact exporter, Java, Gradle, AGP and NDK versions. Only after this test passes should the Android ZIP/release be called complete.
 
-```sh
-unzip -l MyApp.apk | grep CRunINI
-#   assets/mmf/arm64-v8a/CRunINI++.so
-#   assets/mmf/armeabi-v7a/CRunINI++.so
-#   assets/mmf/x86_64/CRunINI++.so
-```
+`tools/package_android_extension.sh` can assemble an `INI++.zip` **overlay** after the three NDK binaries are built, but it is not evidence that Fusion's standard extension-install ZIP merge path or the 295.10 exporter accepts it. It intentionally contains no proprietary exporter/SDK files. See [BUILD.md](BUILD.md) for the output layout and limitations.
 
-At run time, if the object is missing, logcat shows `*** MISSING EXTENSION: INI++`; if the `.so` is there but fails to load, logcat shows the `dlopen`/`dlsym` error (see `docs/BUILD.md` section 7).
+## Acceptance checklist
 
-### 2.4 Using the object in events
-
-Identical to Windows. The Android runtime hands the extension its edit data (the object properties from the MFA), so `Default file`, `Default text`, `Auto save`, `Case sensitive`, `Quote strings`, `Encrypt`, `Compress` and the rest keep behaving as configured. On first tick the object opens/creates its file the same way it does on Windows, only the *directory* changes: names without a path resolve inside the application's private data directory (`<Fusion app files dir>`), which is writable without permissions on every supported Android version:
-
-* `Set current group` / `Set value` / `Set string` + `Save` write e.g. `settings.ini` into the app's data directory.
-* `Load file` / `Save as` with a relative name resolve against the same directory, so an INI saved on one run is found on the next.
-* Absolute paths (`/sdcard/...`, `/storage/...`) are used as given, but they need the permissions Android requires for those locations; the app's data directory is the recommended place.
-
-### 2.5 Notes and limits specific to Android
-
-* The ACEs that had no implementation on Windows either (search, merge, MD5, CSV, charts, dialogs, arrays, rename/move, ...) log `Ini++ (Android): ACE not implemented: <name>` once and do nothing instead of showing a message box. The full list is in `docs/COMPATIBILITY.md`.
-* The four object-based save/load actions (`Save object properties`, `Load object properties` and
-  their "in group" variants) cannot work on Android: the extension API does not expose other
-  objects. On Android they log `Ini++ (Android): this ACE needs another object, ...` and do
-  nothing - they never write bogus values. If your project uses them to persist a player/object
-  state, write the values explicitly instead (`Set value "posx" = X of Sonic`, ...); see
-  `docs/COMPATIBILITY.md` section 3.2.
-* Ini++'s own custom parameters (`Ini++ parameter` in the ACE parameter list) cannot be read through the Android extension API; ACEs that use them see all-zero data. Avoid them in Android projects where the parameter changes behaviour.
-* Encryption (`Encrypt`/`Toggle encryption`) uses the same Thayer cipher as Windows and stays compatible.
-
----
-
-## 3. Upgrading / uninstalling
-
-* **Upgrade:** replace `INI++.mfx` (Windows) and `INI++.zip` (Android) with the new versions; MFAs do not need to be changed. Rebuild the Android app so the new `.so` files are packaged.
-* **Uninstall:** delete the files above. MFAs keep the Ini++ object data (they simply report the object as missing until it is installed again), and the INI files written by the extension are ordinary text files.
+- [ ] Windows runtime and edittime MFX build and load in Fusion 2.5 Unicode.
+- [ ] The user's existing Sonic MFA opens without event changes.
+- [ ] The exact Fusion 2.5 build 295.10 Java/Gradle exporter compiles the adapter and JNI bridge.
+- [ ] `CExtLoad` registration and `assets/mmf/<ABI>/libIniPlusPlusBridge.so` load in the exported APK.
+- [ ] Sonic MFA exports to an APK and launches on a physical Android device.
+- [ ] INI read/write/autosave, UTF-8 data, numeric/position expressions and compatibility with Windows-generated INI files are verified.
+- [ ] Object-based ACEs and custom parameters used by the MFA behave acceptably without event changes.
+- [ ] Any platform differences are documented before packaging a release.

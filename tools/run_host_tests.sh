@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# Build and run the Ini++ Android runtime host tests (see android/tests/HostTests.cpp).
-#
-# These compile the Android implementation (Runtime.cpp, ACEs.cpp, the Android platform layer and
-# the exported extension entry points) with the host compiler against the interface shim in
-# android/sdk-shim, and drive it through a mock of the Fusion Android native extension API.
-# No Android SDK, NDK or Fusion installation is required.
+# Build/run tests for the Java/JNI-independent Android bridge (see android/tests/BridgeTests.cpp).
+# These tests exercise the shared C++ ACE bodies through the project-owned Java/JNI-independent
+# bridge and Android sandbox layer. They do not prove Java compilation or exporter/APK loading.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CXX="${CXX:-g++}"
-BUILD="${BUILD_DIR:-build/android-host-tests}"
-# SANITIZE=1 additionally builds with AddressSanitizer/UndefinedBehaviorSanitizer: the tests then
-# also prove that nothing reads out of bounds (the mock runtime's parameters, the edit data blob).
+BUILD="${BUILD_DIR:-build/android-bridge-tests}"
 SANITIZE="${SANITIZE:-0}"
+
+python3 tools/gen_android_aces.py --check
 mkdir -p "$BUILD"
 if [ "$SANITIZE" = 1 ]; then
 	BUILD="$BUILD/asan"
@@ -23,17 +20,16 @@ FLAGS=(-std=c++20 -O1 -g
        -DFUSION_ANDROID_RUNTIME
        -DFUSION_ACTIONS -DFUSION_CONDITIONS -DFUSION_EXPRESSIONS
        -DNDEBUG
-       -DIPPP_HOST_TESTS
-       -Iandroid/fusion -Iandroid/sdk-shim -Iandroid/runtime -Iandroid/tests/mock-sdk -I.
-       -Wall -Wextra -Wno-unused-parameter)
+       -Iandroid/fusion -Iandroid/runtime -I.)
 
 if [ "$SANITIZE" = 1 ]; then
-	FLAGS+=(-fsanitize=address,undefined -fno-omit-frame-pointer -O1)
+	FLAGS+=(-fsanitize=address,undefined -fno-omit-frame-pointer)
 fi
 
 "$CXX" "${FLAGS[@]}" \
-    android/tests/HostTests.cpp Runtime.cpp ACEs.cpp android/runtime/AndroidRuntime.cpp \
-    android/jni/IniPlusPlusExtension.cc android/fusion/lSDK/UnicodeUtilities.cpp \
-    -o "$BUILD/host-tests" -pthread
+    android/tests/BridgeTests.cpp android/runtime/Bridge.cpp \
+    Runtime.cpp ACEs.cpp android/runtime/AndroidRuntime.cpp \
+    android/fusion/lSDK/UnicodeUtilities.cpp \
+    -o "$BUILD/bridge-tests" -pthread
 
-"$BUILD/host-tests"
+"$BUILD/bridge-tests"

@@ -1,27 +1,23 @@
-// Ini++ Android runtime: platform implementation.
+// Ini++ Android source-adaptation layer.
 //
-// This file provides everything the shared sources (Runtime.cpp, ACEs.cpp, RunData.hpp) expect
-// from the platform when compiled for Android instead of Windows:
-//
-//   * the ACE parameter frame (see ParamFrame.hpp), including the string pool used by temp_string()
-//   * logging (there is no MessageBox on Android)
-//   * the application's writable data directory and file I/O (mvLoadTextFile/mvSaveTextFile)
-//   * SerializedEditData::deserialize(), byte compatible with the blob the Windows editor writes
-//
-// It contains no Fusion-runtime-specific code: the RuntimeFunctions bridge lives in
-// android/jni/IniPlusPlusExtension.cc, so this file can also be compiled and unit tested with a
-// host compiler (see android/tests).
+// This file implements sandbox-constrained file paths, UTF-aware text I/O, logging and the shared
+// edit-data helpers used by Runtime.cpp and ACEs.cpp. Java CRunExtension/JNI lifecycle dispatch
+// lives in android/java and android/jni/JniBridge.cpp; this layer is host-testable without the
+// proprietary Fusion exporter source (see android/tests/BridgeTests.cpp).
 
 #include "FusionAPI.hpp"
 #include "EditData.hpp"
 #include "RunData.hpp"
+#include "AndroidRuntime.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -29,6 +25,10 @@
 #include <vector>
 
 #include <unistd.h>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 namespace ipp_android
 {
@@ -50,12 +50,9 @@ namespace ipp_android
 
 	void* empty_object() noexcept
 	{
-		// The Android extension API cannot deliver Fusion object references or the payload of
-		// Ini++'s own custom parameters, so ACEs that ask for one receive this zeroed block
-		// (documented defaults).  It is laid out like a RunObject, which makes the object ACEs
-		// harmless: a zero headerObject has hoOEFlags == 0, so the shared code's alterable-value
-		// reflection (ACEs.cpp's get_alterables()) returns empty spans and reads nothing - the ACE
-		// does nothing instead of dereferencing a null pointer.  See docs/COMPATIBILITY.md.
+		// Safe placeholder for object/custom parameters that this adapter has not yet marshalled.
+		// It is shaped like a RunObject and has zero OE flags, so current object ACE guards do not
+		// dereference or write through a fabricated Java-object pointer. See docs/COMPATIBILITY.md.
 		static std::array<std::byte, sizeof(RunObject) + sizeof(paramExt) + 64> const block{};
 		return const_cast<std::byte*>(block.data());
 	}
@@ -63,8 +60,15 @@ namespace ipp_android
 	void log(std::string_view const text) noexcept
 	{
 #ifdef __ANDROID__
-		// Android: to logcat (tag "IniPlusPlus"); avoids depending on JNI here.
-		static_cast<void>(std::fprintf(stderr, "IniPlusPlus: %.*s\n", static_cast<int>(text.size()), text.data()));
+		try
+		{
+			std::string const message{text};
+			__android_log_write(ANDROID_LOG_ERROR, "IniPlusPlus", message.c_str());
+		}
+		catch(...)
+		{
+			std::fputs("IniPlusPlus: Android logging failed\n", stderr);
+		}
 #else
 		std::fputs("IniPlusPlus: ", stderr);
 		std::fwrite(text.data(), 1, text.size(), stderr);
@@ -72,16 +76,51 @@ namespace ipp_android
 #endif
 	}
 
+	namespace
+	{
+		std::mutex& data_directory_mutex() noexcept
+		{
+			static std::mutex mutex;
+			return mutex;
+		}
+
+		std::filesystem::path& configured_data_directory() noexcept
+		{
+			static std::filesystem::path directory;
+			return directory;
+		}
+	}
+
+	void set_data_dir(std::filesystem::path directory) noexcept
+	{
+		try
+		{
+			if(directory.empty())
+			{
+				return;
+			}
+			std::lock_guard const lock{data_directory_mutex()};
+			configured_data_directory() = std::move(directory);
+		}
+		catch(...)
+		{
+			log("Ini++: unable to set the app-private data directory");
+		}
+	}
+
 	std::filesystem::path data_dir()
 	{
-		// The Fusion 2.5 Android runtime gives every application a private directory and resolves
-		// the application's file names against it; extension natives load from <dataDir>/libs
-		// (see Runtime.Native.init in the runtime). There is no path API in the native extension
-		// interface, so the sandbox directory is derived from the process name, with an override
-		// for tests and for unusual setups:
-		//   1. $INIPLUSPLUS_ANDROID_DATA_DIR
-		//   2. /data/data/<package name from /proc/self/cmdline>
-		//   3. the current working directory
+		{
+			std::lock_guard const lock{data_directory_mutex()};
+			if(!configured_data_directory().empty())
+			{
+				return configured_data_directory();
+			}
+		}
+
+		// The normal Java extension path supplies Context.getFilesDir() before creating an object.
+		// This fallback exists for host tests and older loader setups only; it is not used when the
+		// supported Java adapter has initialized the bridge.
 		if(char const* const override_dir{std::getenv("INIPLUSPLUS_ANDROID_DATA_DIR")})
 		{
 			if(*override_dir)
@@ -119,16 +158,76 @@ namespace ipp_android
 // -------------------------------------------------------------------------------------------------
 namespace
 {
-	[[nodiscard]] std::filesystem::path resolve_path(TCHAR const* const filename)
+	[[nodiscard]] bool is_within(std::filesystem::path const& root, std::filesystem::path const& path)
 	{
-		// The Windows runtime resolves relative names against the application directory; the
-		// Android sandbox directory plays that role here.
-		std::filesystem::path path{filename ? filename : ""};
-		if(!path.has_root_path())
+		auto const relative{path.lexically_relative(root)};
+		if(relative.empty())
 		{
-			path = ::ipp_android::data_dir() / path;
+			return path == root;
 		}
-		path.make_preferred();
+		auto const first{relative.begin()};
+		return first != relative.end() && *first != "..";
+	}
+
+	[[nodiscard]] std::optional<std::filesystem::path> resolve_path_impl(std::filesystem::path requested)
+	{
+		// Every path is confined to the Context.getFilesDir() tree. Relative names (the normal
+		// INI++ case) are resolved there. Existing absolute paths are accepted only when they are
+		// already inside that tree; Windows drive prefixes from an old MFA are stripped and treated
+		// as a sandbox-relative path (C:\\Game\\save.ini -> <filesDir>/Game/save.ini).
+		auto root{std::filesystem::absolute(::ipp_android::data_dir()).lexically_normal()};
+		std::string name{requested.string()};
+		std::replace(name.begin(), name.end(), '\\', '/');
+		if(name.size() >= 2 && std::isalpha(static_cast<unsigned char>(name[0])) && name[1] == ':')
+		{
+			name.erase(0, 2);
+			while(!name.empty() && name.front() == '/')
+			{
+				name.erase(name.begin());
+			}
+		}
+		requested = std::filesystem::path{name};
+		auto path{requested.is_absolute() ? requested.lexically_normal() : (root / requested).lexically_normal()};
+		if(requested.is_absolute() && is_within(root, path))
+		{
+			auto const relative{path.lexically_relative(root)};
+			auto component{relative.begin()};
+			if(component != relative.end())
+			{
+				auto const drive{component->string()};
+				if(drive.size() == 2 && std::isalpha(static_cast<unsigned char>(drive[0])) && drive[1] == ':')
+				{
+					std::filesystem::path remainder;
+					for(++component; component != relative.end(); ++component)
+					{
+						remainder /= *component;
+					}
+					path = (root / remainder).lexically_normal();
+				}
+			}
+		}
+		if(!is_within(root, path))
+		{
+			::ipp_android::log("Ini++: refusing a file path outside the app sandbox");
+			return {};
+		}
+
+		// Lexical checks alone do not contain a path that traverses an in-sandbox symlink pointing
+		// elsewhere. Resolve the existing parent components and fail closed on canonicalization
+		// errors; weakly_canonical also works for files that have not been created yet.
+		std::error_code ec{};
+		auto const canonical_root{std::filesystem::weakly_canonical(root, ec)};
+		if(ec)
+		{
+			return {};
+		}
+		ec.clear();
+		auto const canonical_path{std::filesystem::weakly_canonical(path, ec)};
+		if(ec || !is_within(canonical_root, canonical_path))
+		{
+			::ipp_android::log("Ini++: refusing a path that resolves outside the app sandbox");
+			return {};
+		}
 		return path;
 	}
 
@@ -227,12 +326,26 @@ namespace
 	}
 }
 
+std::optional<std::filesystem::path> ipp_android::safe_data_path(std::filesystem::path path)
+{
+	try
+	{
+		return resolve_path_impl(std::move(path));
+	}
+	catch(...)
+	{
+		::ipp_android::log("Ini++: unable to resolve a path inside the app sandbox");
+		return {};
+	}
+}
+
 TCHAR* mvLoadTextFile(mv* const, TCHAR const* const filename, std::int32_t const encoding, std::int32_t const) noexcept
 {
 	try
 	{
 		std::string bytes;
-		if(!read_whole_file(resolve_path(filename), bytes))
+		auto const path{ipp_android::safe_data_path(std::filesystem::path{filename ? filename : ""})};
+		if(!path || !read_whole_file(*path, bytes))
 		{
 			return nullptr;
 		}
@@ -257,13 +370,17 @@ std::int32_t mvSaveTextFile(mv* const, TCHAR const* const filename, TCHAR const*
 {
 	try
 	{
-		auto const path{resolve_path(filename)};
-		if(!path.parent_path().empty())
+		auto const path{ipp_android::safe_data_path(std::filesystem::path{filename ? filename : ""})};
+		if(!path)
+		{
+			return FALSE;
+		}
+		if(!path->parent_path().empty())
 		{
 			std::error_code ec{};
-			std::filesystem::create_directories(path.parent_path(), ec);
+			std::filesystem::create_directories(path->parent_path(), ec);
 		}
-		std::ofstream ofs{path, std::ios::binary | std::ios::trunc};
+		std::ofstream ofs{*path, std::ios::binary | std::ios::trunc};
 		if(!ofs)
 		{
 			return FALSE;

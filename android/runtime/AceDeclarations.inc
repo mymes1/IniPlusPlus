@@ -1,4 +1,4 @@
-// This file is included at global scope (see IniPlusPlusExtension.cc).
+// This file is included at global scope (see Bridge.cpp).
 namespace ipp_android
 {
 	inline constexpr int number_of_actions     = 84;
