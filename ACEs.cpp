@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <bit>
 #include <charconv>
 #include <concepts>
 #include <limits>
@@ -600,14 +601,14 @@ struct SaveObjectDoer final
 				auto& rov{*static_cast<mc<Const, rVal20a>*>(rov_ptr)};
 				assert(false); //not easy to support values in this version like this
 				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
+				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
 				auto& rov{*static_cast<mc<Const, rVal20b>*>(rov_ptr)};
 				ret.values = values_span_t{rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
 				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
+				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
@@ -617,12 +618,11 @@ struct SaveObjectDoer final
 					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
 				}
 				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
-				ret.flags = flags_span_t{reinterpret_cast<flags_element_t*>(&rov.rvValueFlags), 1};
+				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 			else
 			{
-				using rov_pointer_t = std::conditional_t<Const, rVal25P const*, rVal25P*>;
-				auto& rov{*reinterpret_cast<rov_pointer_t>(rov_ptr)};
+				auto& rov{*reinterpret_cast<mc<Const, rVal25P>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
 					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
@@ -631,8 +631,7 @@ struct SaveObjectDoer final
 				{
 					ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				auto const flag_pointer{reinterpret_cast<flags_element_t*>(std::addressof(rov.rvValueFlags))};
-				ret.flags = flags_span_t{flag_pointer, std::size_t{1}};
+				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 		}
 		return ret;
@@ -2277,13 +2276,13 @@ static auto get_e_float(RunData* const run_data, e_params_t const params_handle)
 {
 	if constexpr(First)
 	{
-		std::int32_t const v{CNC_GetFirstExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-		return *reinterpret_cast<float const*>(&v);
+		auto const bits{static_cast<std::uint32_t>(CNC_GetFirstExpressionParameter(run_data, params_handle, TYPE_FLOAT))};
+		return std::bit_cast<float>(bits);
 	}
-	else if constexpr(!First)
+	else
 	{
-		std::int32_t const v{CNC_GetNextExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-		return *reinterpret_cast<float const*>(&v);
+		auto const bits{static_cast<std::uint32_t>(CNC_GetNextExpressionParameter(run_data, params_handle, TYPE_FLOAT))};
+		return std::bit_cast<float>(bits);
 	}
 }
 static auto temp_string(RunData* const run_data, string_view_t const str) noexcept
