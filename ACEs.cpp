@@ -10,6 +10,7 @@
 #include <charconv>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <span>
@@ -32,6 +33,66 @@ using fusion::e_params_t;
 using lSDK::char_t;
 using lSDK::string_t;
 using lSDK::string_view_t;
+
+namespace
+{
+#if defined(FUSION_ANDROID_RUNTIME)
+using rVal20a_layout_t = rVal20a;
+using rVal20b_layout_t = rVal20b;
+using rVal25_layout_t = rVal25;
+using rVal25P_layout_t = rVal25P;
+#else
+// The public Windows SDK only declares its current rVal layout. Ini++ also inspects the
+// historical runtime layouts, so keep these private, versioned views here. They preserve the
+// original Fusion field offsets, including reserved slots used for forward/backward compatibility.
+struct rVal20a_layout_t final
+{
+	std::int32_t rvValues[VALUES_NUMBEROF_ALTERABLE];
+	std::int32_t rvValueFlags;
+	std::uint8_t rvValuesType[VALUES_NUMBEROF_ALTERABLE];
+	TCHAR* rvStrings[STRINGS_NUMBEROF_ALTERABLE];
+};
+struct rVal20b_layout_t final
+{
+	CValue* rvpValues;
+	std::int32_t rvFree1[VALUES_NUMBEROF_ALTERABLE - 1];
+	std::int32_t rvValueFlags;
+	std::uint8_t rvFree2[VALUES_NUMBEROF_ALTERABLE];
+	TCHAR* rvStrings[STRINGS_NUMBEROF_ALTERABLE];
+};
+struct rVal25_layout_t final
+{
+	CValue* rvpValues;
+	std::int32_t rvNumberOfValues;
+	std::int32_t rvFree1[VALUES_NUMBEROF_ALTERABLE - 2];
+	std::int32_t rvValueFlags;
+	std::uint8_t rvFree2[VALUES_NUMBEROF_ALTERABLE];
+	TCHAR* rvStrings[STRINGS_NUMBEROF_ALTERABLE];
+};
+struct rVal25P_layout_t final
+{
+	CValue* rvpValues;
+	std::int32_t rvNumberOfValues;
+	std::int32_t rvFree1[VALUES_NUMBEROF_ALTERABLE - 2];
+	std::int32_t rvValueFlags;
+	std::uint8_t rvFree2[VALUES_NUMBEROF_ALTERABLE];
+	TCHAR** rvpStrings;
+	std::int32_t rvNumberOfStrings;
+	TCHAR* rvFree3[STRINGS_NUMBEROF_ALTERABLE - 2];
+};
+static_assert(sizeof(rVal20a_layout_t) == sizeof(rVal));
+static_assert(offsetof(rVal20a_layout_t, rvValueFlags) == offsetof(rVal, rvValueFlags));
+static_assert(offsetof(rVal20a_layout_t, rvStrings) == offsetof(rVal, rvStrings));
+static_assert(sizeof(rVal20b_layout_t) == sizeof(rVal));
+static_assert(offsetof(rVal20b_layout_t, rvValueFlags) == offsetof(rVal, rvValueFlags));
+static_assert(offsetof(rVal20b_layout_t, rvStrings) == offsetof(rVal, rvStrings));
+static_assert(offsetof(rVal25_layout_t, rvValueFlags) == offsetof(rVal20b_layout_t, rvValueFlags));
+static_assert(offsetof(rVal25_layout_t, rvStrings) == offsetof(rVal20b_layout_t, rvStrings));
+static_assert(sizeof(rVal25P_layout_t) == sizeof(rVal25_layout_t));
+static_assert(offsetof(rVal25P_layout_t, rvValueFlags) == offsetof(rVal25_layout_t, rvValueFlags));
+static_assert(offsetof(rVal25P_layout_t, rvpStrings) == offsetof(rVal25_layout_t, rvStrings));
+#endif
+}
 
 [[nodiscard]] static constexpr auto toLower(TCHAR const c) noexcept
 -> TCHAR
@@ -599,21 +660,21 @@ struct SaveObjectDoer final
 			mc<Const, void>* const rov_ptr{reinterpret_cast<mc<Const, std::byte>*>(&obj.roHo) + obj.roHo.hoOffsetValue};
 			if((fusion_version & MMFBUILD_MASK) < 243)
 			{
-				auto& rov{*static_cast<mc<Const, rVal20a>*>(rov_ptr)};
+				auto& rov{*static_cast<mc<Const, rVal20a_layout_t>*>(rov_ptr)};
 				assert(false); //not easy to support values in this version like this
 				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
-				auto& rov{*static_cast<mc<Const, rVal20b>*>(rov_ptr)};
+				auto& rov{*static_cast<mc<Const, rVal20b_layout_t>*>(rov_ptr)};
 				ret.values = values_span_t{rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
 				ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
-				auto& rov{*static_cast<mc<Const, rVal25>*>(rov_ptr)};
+				auto& rov{*static_cast<mc<Const, rVal25_layout_t>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
 					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
@@ -623,7 +684,7 @@ struct SaveObjectDoer final
 			}
 			else
 			{
-				auto& rov{*reinterpret_cast<mc<Const, rVal25P>*>(rov_ptr)};
+				auto& rov{*reinterpret_cast<mc<Const, rVal25P_layout_t>*>(rov_ptr)};
 				if(rov.rvNumberOfValues >= 0)
 				{
 					ret.values = values_span_t{rov.rvpValues, static_cast<std::size_t>(rov.rvNumberOfValues)};
@@ -632,9 +693,7 @@ struct SaveObjectDoer final
 				{
 					ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				auto const flags_pointer{reinterpret_cast<flags_element_t*>(
-					reinterpret_cast<mc<Const, std::byte>*>(rov_ptr) + offsetof(rVal25P, rvValueFlags))};
-				ret.flags = flags_span_t{flags_pointer, std::size_t{1}};
+				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
 			}
 		}
 		return ret;
@@ -655,13 +714,13 @@ struct SaveObjectDoer final
 			void* const rov_ptr{reinterpret_cast<std::byte*>(&obj.roHo) + obj.roHo.hoOffsetValue};
 			if((fusion_version & MMFBUILD_MASK) < 243)
 			{
-				auto& rov{*static_cast<rVal20a*>(rov_ptr)};
+				auto& rov{*static_cast<rVal20a_layout_t*>(rov_ptr)};
 				std::ignore = new_size;//can't resize
 				assert(false); //not easy to support values in this version like this
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
-				auto& rov{*static_cast<rVal20b*>(rov_ptr)};
+				auto& rov{*static_cast<rVal20b_layout_t*>(rov_ptr)};
 				std::ignore = new_size;//can't resize
 				values = std::span<CValue>{rov.rvpValues, VALUES_NUMBEROF_ALTERABLE};
 			}
@@ -671,13 +730,13 @@ struct SaveObjectDoer final
 				std::int32_t* rvNumberOfValues{};
 				if((fusion_version & MMFBUILD_MASK) < 292)
 				{
-					auto& rov{*static_cast<rVal25*>(rov_ptr)};
+					auto& rov{*static_cast<rVal25_layout_t*>(rov_ptr)};
 					rvpValues = &(rov.rvpValues);
 					rvNumberOfValues = reinterpret_cast<std::int32_t*>(&(rov.rvNumberOfValues));
 				}
 				else
 				{
-					auto& rov{*static_cast<rVal25P*>(rov_ptr)};
+					auto& rov{*static_cast<rVal25P_layout_t*>(rov_ptr)};
 					rvpValues = &(rov.rvpValues);
 					rvNumberOfValues = reinterpret_cast<std::int32_t*>(&(rov.rvNumberOfValues));
 				}
@@ -721,25 +780,25 @@ struct SaveObjectDoer final
 			void* const rov_ptr{reinterpret_cast<std::byte*>(&obj.roHo) + obj.roHo.hoOffsetValue};
 			if((fusion_version & MMFBUILD_MASK) < 243)
 			{
-				auto& rov{*static_cast<rVal20a*>(rov_ptr)};
+				auto& rov{*static_cast<rVal20a_layout_t*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
 				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else if((fusion_version & MMFVERSION_MASK) < MMFVERSION_25)
 			{
-				auto& rov{*static_cast<rVal20b*>(rov_ptr)};
+				auto& rov{*static_cast<rVal20b_layout_t*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
 				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else if((fusion_version & MMFBUILD_MASK) < 292)
 			{
-				auto& rov{*static_cast<rVal25*>(rov_ptr)};
+				auto& rov{*static_cast<rVal25_layout_t*>(rov_ptr)};
 				std::ignore = new_size; //can't resize
 				strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvStrings), STRINGS_NUMBEROF_ALTERABLE};
 			}
 			else
 			{
-				auto& rov{*static_cast<rVal25P*>(rov_ptr)};
+				auto& rov{*static_cast<rVal25P_layout_t*>(rov_ptr)};
 				if(rov.rvNumberOfStrings >= 0 && static_cast<std::size_t>(rov.rvNumberOfStrings) >= new_size)
 				{
 					strings = std::span<void*>{reinterpret_cast<decltype(strings)::pointer>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
