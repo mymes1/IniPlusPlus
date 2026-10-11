@@ -1,92 +1,41 @@
-6s
-                ^
-                std::
-./../../ACEs.cpp:322:9: warning: unqualified call to 'std::move' [-Wunqualified-std-cast-call]
-        , item{move(item_)}
-               ^
-               std::
-./../../ACEs.cpp:1107:65: warning: unqualified call to 'std::move' [-Wunqualified-std-cast-call]
-        data.do_doer<ValueDoer>(data, string_t{group}, string_t{item}, move(value));
-                                                                       ^
-                                                                       std::
-./../../ACEs.cpp:2280:24: error: non-constant-expression cannot be narrowed from type 'std::intptr_t' (aka 'long') to 'std::int32_t' (aka 'int') in initializer list [-Wc++11-narrowing]
-                std::int32_t const v{CNC_GetFirstExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./../../android/fusion/FusionAPI.hpp:169:64: note: expanded from macro 'CNC_GetFirstExpressionParameter'
-#define CNC_GetFirstExpressionParameter(rd, params_handle, ty) ((void)(params_handle), ::ipp_android::current_frame().cnc_get_expression(ty))
-                                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./../../ACEs.cpp:2280:24: note: insert an explicit cast to silence this issue
-                std::int32_t const v{CNC_GetFirstExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                                     static_cast<int32_t>(                                               )
-./../../android/fusion/FusionAPI.hpp:169:64: note: expanded from macro 'CNC_GetFirstExpressionParameter'
-#define CNC_GetFirstExpressionParameter(rd, params_handle, ty) ((void)(params_handle), ::ipp_android::current_frame().cnc_get_expression(ty))
-                                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./../../ACEs.cpp:2285:24: error: non-constant-expression cannot be narrowed from type 'std::intptr_t' (aka 'long') to 'std::int32_t' (aka 'int') in initializer list [-Wc++11-narrowing]
-                std::int32_t const v{CNC_GetNextExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./../../android/fusion/FusionAPI.hpp:170:64: note: expanded from macro 'CNC_GetNextExpressionParameter'
-#define CNC_GetNextExpressionParameter(rd, params_handle, ty)  ((void)(params_handle), ::ipp_android::current_frame().cnc_get_expression(ty))
-                                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./../../ACEs.cpp:2285:24: note: insert an explicit cast to silence this issue
-                std::int32_t const v{CNC_GetNextExpressionParameter(run_data, params_handle, TYPE_FLOAT)};
-                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                                     static_cast<int32_t>(                                              )
-./../../android/fusion/FusionAPI.hpp:170:64: note: expanded from macro 'CNC_GetNextExpressionParameter'
-#define CNC_GetNextExpressionParameter(rd, params_handle, ty)  ((void)(params_handle), ::ipp_android::current_frame().cnc_get_expression(ty))
-                                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-6 warnings and 2 errors generated.
-make: *** [/usr/local/lib/android/sdk/ndk/26.1.10909125/build/core/build-binary.mk:415: /home/runner/work/IniPlusPlus/IniPlusPlus/build/android/obj/local/arm64-v8a/objs/IniPlusPlusBridge/__/__/ACEs.o] Error 1
-make: *** Waiting for unfinished jobs....
-make: Entering directory '/home/runner/work/IniPlusPlus/IniPlusPlus/android/jni'
-[arm64-v8a] Compile++      : IniPlusPlusBridge <= Runtime.cpp
-make: Leaving directory '/home/runner/work/IniPlusPlus/IniPlusPlus/android/jni'
-Error: Process completed with exit code 2. and 22s
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(339,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(const std::array<_OtherTy,_Size> &) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(334,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(std::array<_OtherTy,_Size> &) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(330,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(const int (&)[_Size]) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(316,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(_It,_Sentinel) noexcept(<expr>)'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(305,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(_It,std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::size_type) noexcept'
-          D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(620,29):
-          while trying to match the argument list '(int)'
+4s
+Run New-Item -ItemType Directory -Force `
+  New-Item -ItemType Directory -Force `
+    -Path "dist/windows/runtime", "dist/windows/edittime" | Out-Null
   
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(624,61): error C2059: syntax error: 'const' [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(624,77): error C2059: syntax error: '>' [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(625,15): error C2100: you cannot dereference an operand of type 'const void' [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(634,69): error C2672: 'std::addressof': no matching overloaded function found [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-      C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\type_traits(1529,12):
-      could be 'const _Ty *std::addressof(const _Ty &&)'
-      C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\type_traits(1524,27):
-      or       '_Ty *std::addressof(_Ty &) noexcept'
+  Copy-Item "Build/Output/Runtime/INI++15.mfx" `
+    "dist/windows/runtime/INI++.mfx"
+  Copy-Item "Build/Output/Edittime/INI++15.mfx" `
+    "dist/windows/edittime/INI++.mfx"
   
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(634,28): error C2119: 'flag_pointer': the type for 'const auto' cannot be deduced from an empty initializer [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(635,29): error C2440: '<function-style-cast>': cannot convert from 'initializer list' to 'SaveObjectDoer::get_alterables::flags_span_t' [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-      D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(635,29):
-      'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span': function does not take 2 arguments
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(355,5):
-          could be 'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(const std::span<_OtherTy,_OtherExtent> &) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(342,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(_Rng &&)'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(339,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(const std::array<_OtherTy,_Size> &) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(334,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(std::array<_OtherTy,_Size> &) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(330,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(const int (&)[_Size]) noexcept'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(316,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(_It,_Sentinel) noexcept(<expr>)'
-          C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\include\span(305,5):
-          or       'std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::span(_It,std::span<SaveObjectDoer::get_alterables::flags_element_t,4294967295>::size_type) noexcept'
-          D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(635,29):
-          while trying to match the argument list '(<error type>, size_t)'
+  $vsRoot = "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+  $dumpbin = Get-ChildItem $vsRoot -Recurse -Filter dumpbin.exe `
+    -ErrorAction SilentlyContinue | Select-Object -First 1
   
-D:\a\IniPlusPlus\IniPlusPlus\ACEs.cpp(625,15): error C2100: you cannot dereference an operand of type 'void' [D:\a\IniPlusPlus\IniPlusPlus\INI++15.vcxproj]
-  Menus.cpp
-  Properties.cpp
-  Runtime.cpp
+  if (-not $dumpbin) {
+    throw "dumpbin.exe was not found; cannot check runtime MFX exports"
+  }
+  
+  $dumpbinPath = $dumpbin.FullName
+  $exports = & $dumpbinPath /nologo /exports `
+    "dist/windows/runtime/INI++.mfx" | Out-String
+  
+  foreach ($symbol in @(
+    "GetInfos",
+    "GetRunObjectInfos",
+    "CreateRunObject",
+    "GetRunObjectDataSize"
+  )) {
+    if ($exports -notmatch $symbol) {
+      throw "Runtime MFX does not export $symbol"
+    }
+  }
+  shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+  env:
+    ANDROID_NDK_VERSION: 26.1.10909125
+Exception: D:\a\_temp\f59221ee-0f10-4586-9260-ee187019fd8c.ps1:15
+Line |
+  15 |    throw "dumpbin.exe was not found; cannot check runtime MFX exports"
+     |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | dumpbin.exe was not found; cannot check runtime MFX exports
 Error: Process completed with exit code 1.
