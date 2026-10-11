@@ -9,6 +9,7 @@
 #include <bit>
 #include <charconv>
 #include <concepts>
+#include <cstddef>
 #include <limits>
 #include <memory>
 #include <span>
@@ -631,7 +632,9 @@ struct SaveObjectDoer final
 				{
 					ret.strings = strings_span_t{reinterpret_cast<strings_element_t*>(rov.rvpStrings), static_cast<std::size_t>(rov.rvNumberOfStrings)};
 				}
-				ret.flags = flags_span_t{std::addressof(rov.rvValueFlags), std::size_t{1}};
+				auto const flags_pointer{reinterpret_cast<flags_element_t*>(
+					reinterpret_cast<mc<Const, std::byte>*>(rov_ptr) + offsetof(rVal25P, rvValueFlags))};
+				ret.flags = flags_span_t{flags_pointer, std::size_t{1}};
 			}
 		}
 		return ret;
