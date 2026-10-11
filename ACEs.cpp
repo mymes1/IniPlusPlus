@@ -45,6 +45,7 @@ using rVal25P_layout_t = rVal25P;
 // The public Windows SDK only declares its current rVal layout. Ini++ also inspects the
 // historical runtime layouts, so keep these private, versioned views here. They preserve the
 // original Fusion field offsets, including reserved slots used for forward/backward compatibility.
+#pragma pack(push, 2)
 struct rVal20a_layout_t final
 {
 	std::int32_t rvValues[VALUES_NUMBEROF_ALTERABLE];
@@ -80,6 +81,7 @@ struct rVal25P_layout_t final
 	std::int32_t rvNumberOfStrings;
 	TCHAR* rvFree3[STRINGS_NUMBEROF_ALTERABLE - 2];
 };
+#pragma pack(pop)
 static_assert(sizeof(rVal20a_layout_t) == sizeof(rVal));
 static_assert(offsetof(rVal20a_layout_t, rvValueFlags) == offsetof(rVal, rvValueFlags));
 static_assert(offsetof(rVal20a_layout_t, rvStrings) == offsetof(rVal, rvStrings));
