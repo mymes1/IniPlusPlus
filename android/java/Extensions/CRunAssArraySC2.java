@@ -1,7 +1,6 @@
-// Android adapter for the subset of the original AssArray 1.21 ACEs used by Sonic Classic 2.
-//
-// ACE IDs below come from the supplied AssArray.mfx metadata table. Only Set Value at Key,
-// Clear Array, Load INI into Values, Save INI from Values, and GetValue are implemented here.
+// Android runtime for the separate ASSARRAYSC2 extension object.
+// The ACE IDs/signatures match the five operations used by the Sonic Classic 2 event set; this class
+// does not replace or depend on the original ASSARRAY runtime.
 package Extensions;
 
 import java.io.File;
@@ -13,17 +12,17 @@ import Objects.CExtension;
 import RunLoop.CCreateObjectInfo;
 import Services.CBinaryFile;
 
-public final class CRunAssArray extends CRunExtension {
+public final class CRunAssArraySC2 extends CRunExtension {
     private static final int CONDITION_COUNT = 12;
 
-    // Original AssArray ACE IDs from AssArray.mfx.
+    // Stable ACE IDs shared with the five operations in the Sonic Classic 2 event set.
     private static final int ACTION_SET_VALUE_AT_KEY = 0;
     private static final int ACTION_CLEAR_ARRAY = 3;
     private static final int ACTION_LOAD_INI_INTO_VALUES = 12;
     private static final int ACTION_SAVE_INI_FROM_VALUES = 14;
     private static final int EXPRESSION_GET_VALUE = 0;
 
-    private AssArrayIniStore store;
+    private AssArraySC2IniStore store;
 
     @Override
     public int getNumberOfConditions() {
@@ -39,7 +38,7 @@ public final class CRunAssArray extends CRunExtension {
         if (extensionObject != null && extensionObject.getControlsContext() != null) {
             filesDirectory = extensionObject.getControlsContext().getFilesDir();
         }
-        store = new AssArrayIniStore(filesDirectory);
+        store = new AssArraySC2IniStore(filesDirectory);
         return false;
     }
 
@@ -82,7 +81,7 @@ public final class CRunAssArray extends CRunExtension {
                 store.save(act.getParamExpString(rh, 0));
                 break;
             default:
-                // Other AssArray actions are intentionally not implemented in this subset.
+                // Other actions are outside the five-operation replacement target.
                 break;
         }
     }

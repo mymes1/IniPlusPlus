@@ -1,0 +1,22 @@
+EXPORTS
+    GetInfos
+    GetRunObjectInfos
+    GetObjInfos
+
+    GetActionMenu
+    GetActionCodeFromMenu
+    GetActionInfos
+    GetActionTitle
+    GetActionString
+
+    GetConditionMenu
+    GetConditionCodeFromMenu
+    GetConditionInfos
+    GetConditionTitle
+    GetConditionString
+
+    GetExpressionMenu
+    GetExpressionCodeFromMenu
+    GetExpressionInfos
+    GetExpressionString
+    GetExpressionParam

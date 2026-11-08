@@ -70,19 +70,19 @@ jobs:
 
       # JDK 17 is used by sdkmanager here. It is not a validated JDK for
       # the Fusion 295.10 Gradle exporter.
-      - name: Install Java for Android SDK tools and AssArray store tests
+      - name: Install Java for Android SDK tools and AssArraySC2 store tests
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Compile and test AssArray INI store against Sonic Classic 1 format fixture
+      - name: Compile and test ASSARRAYSC2 INI store against Sonic Classic 1 format fixture
         run: |
-          mkdir -p build/assarray-tests
-          javac -encoding UTF-8 -d build/assarray-tests \
-            android/java/Extensions/AssArrayIniStore.java \
-            android/tests/AssArrayIniStoreTests.java
-          java -cp build/assarray-tests Extensions.AssArrayIniStoreTests ringdata.sav
+          mkdir -p build/assarraysc2-tests
+          javac -encoding UTF-8 -d build/assarraysc2-tests \
+            android/java/Extensions/AssArraySC2IniStore.java \
+            android/tests/AssArraySC2IniStoreTests.java
+          java -cp build/assarraysc2-tests Extensions.AssArraySC2IniStoreTests ringdata.sav
 
       - name: Install Android SDK command-line tools
         uses: android-actions/setup-android@v3
@@ -132,8 +132,8 @@ jobs:
             --android-dir build/android \
             --out build/android-package
 
-      - name: Package AssArray Android compatibility subset
-        run: tools/package_assarray_android_extension.sh --out build/android-package
+      - name: Package separate ASSARRAYSC2 Android extension runtime
+        run: tools/package_assarray_sc2_android_extension.sh --out build/android-package
 
       - name: Upload Android native libraries and overlays
         uses: actions/upload-artifact@v4
@@ -142,7 +142,7 @@ jobs:
           path: |
             build/android/assets/mmf/**/libIniPlusPlusBridge.so
             build/android-package/INI++.zip
-            build/android-package/ASSARRAY.zip
+            build/android-package/ASSARRAYSC2.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -172,6 +172,14 @@ jobs:
             /m /nologo /v:minimal `
             /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
 
+          msbuild extensions/AssArraySC2/AssArraySC2.vcxproj `
+            /m /nologo /v:minimal `
+            /p:Configuration=Runtime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+
+          msbuild extensions/AssArraySC2/AssArraySC2.vcxproj `
+            /m /nologo /v:minimal `
+            /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+
       - name: Collect and check MFX files
         shell: pwsh
         run: |
@@ -182,6 +190,11 @@ jobs:
             "dist/windows/runtime/INI++.mfx"
           Copy-Item "Build/Output/Edittime/INI++15.mfx" `
             "dist/windows/edittime/INI++.mfx"
+
+          Copy-Item "build/mfx/AssArraySC2/Runtime/AssArraySC2.mfx" `
+            "dist/windows/runtime/AssArraySC2.mfx"
+          Copy-Item "build/mfx/AssArraySC2/Edittime/AssArraySC2.mfx" `
+            "dist/windows/edittime/AssArraySC2.mfx"
 
           $vsRoots = @(
             (Join-Path $env:ProgramFiles "Microsoft Visual Studio"),
@@ -213,6 +226,34 @@ jobs:
           )) {
             if ($exports -notmatch $symbol) {
               throw "Runtime MFX does not export $symbol"
+            }
+          }
+
+          $assArrayRuntime = & $dumpbinPath /nologo /exports `
+            "dist/windows/runtime/AssArraySC2.mfx" | Out-String
+          foreach ($symbol in @(
+            "GetInfos",
+            "GetRunObjectInfos",
+            "CreateRunObject",
+            "GetRunObjectDataSize"
+          )) {
+            if ($assArrayRuntime -notmatch $symbol) {
+              throw "AssArraySC2 Runtime MFX does not export $symbol"
+            }
+          }
+
+          $assArrayEdittime = & $dumpbinPath /nologo /exports `
+            "dist/windows/edittime/AssArraySC2.mfx" | Out-String
+          foreach ($symbol in @(
+            "GetInfos",
+            "GetRunObjectInfos",
+            "GetObjInfos",
+            "GetActionMenu",
+            "GetActionInfos",
+            "GetExpressionInfos"
+          )) {
+            if ($assArrayEdittime -notmatch $symbol) {
+              throw "AssArraySC2 Edittime MFX does not export $symbol"
             }
           }
 

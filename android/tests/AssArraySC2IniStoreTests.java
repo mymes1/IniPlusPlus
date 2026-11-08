@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
-public final class AssArrayIniStoreTests {
+public final class AssArraySC2IniStoreTests {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
@@ -15,7 +15,7 @@ public final class AssArrayIniStoreTests {
 
     public static void main(String[] args) throws Exception {
         if (args.length != 1) {
-            throw new IllegalArgumentException("usage: AssArrayIniStoreTests <ringdata.sav>");
+            throw new IllegalArgumentException("usage: AssArraySC2IniStoreTests <ringdata.sav>");
         }
 
         File sample = new File(args[0]).getCanonicalFile();
@@ -24,7 +24,7 @@ public final class AssArrayIniStoreTests {
         File copiedSample = new File(filesDirectory, "ringdata.sav");
         Files.copy(sample.toPath(), copiedSample.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-        AssArrayIniStore store = new AssArrayIniStore(filesDirectory);
+        AssArraySC2IniStore store = new AssArraySC2IniStore(filesDirectory);
         require(store.load("ringdata.sav"), "load the supplied flat INI save");
         require(store.get("RING1392") == 1.0, "case-insensitive GetValue finds a saved lowercase ring key");
         require(store.get("ring4533") == 1.0, "load the final key from the sample");
@@ -37,7 +37,7 @@ public final class AssArrayIniStoreTests {
         require(!savedText.startsWith("["), "save output is flat and has no section header");
         require(savedText.contains("ring9999=1\r\n"), "save output uses lowercase keys and integer formatting");
 
-        AssArrayIniStore roundTrip = new AssArrayIniStore(filesDirectory);
+        AssArraySC2IniStore roundTrip = new AssArraySC2IniStore(filesDirectory);
         require(roundTrip.load("roundtrip.sav"), "reload the saved round-trip file");
         require(roundTrip.get("RING9999") == 1.0, "round-trip retains numeric values and case-insensitive keys");
 
@@ -48,10 +48,15 @@ public final class AssArrayIniStoreTests {
         require(!roundTrip.load("opaque.sav"), "unrecognized binary data is rejected");
         require(roundTrip.get("RING9999") == 1.0, "rejected data does not clear current values");
 
+        File stringOnly = new File(filesDirectory, "strings.ini");
+        Files.write(stringOnly.toPath(), "[profile]\r\nname=player\r\n".getBytes(StandardCharsets.UTF_8));
+        require(!roundTrip.load("strings.ini"), "sectioned string-only INI is rejected as a numeric array");
+        require(roundTrip.get("RING9999") == 1.0, "rejected string-only data preserves current values");
+
         require(!roundTrip.save("../escape.sav"), "parent traversal is rejected");
-        System.out.println("AssArray INI store tests passed against " + sample.getName());
+        System.out.println("AssArraySC2 store tests passed against " + sample.getName());
     }
 
-    private AssArrayIniStoreTests() {
+    private AssArraySC2IniStoreTests() {
     }
 }

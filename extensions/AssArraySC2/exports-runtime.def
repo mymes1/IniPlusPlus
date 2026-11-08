@@ -1,0 +1,10 @@
+EXPORTS
+    GetInfos
+    GetRunObjectInfos
+
+    GetRunObjectDataSize
+    CreateRunObject
+    DestroyRunObject
+    HandleRunObject
+    PauseRunObject
+    ContinueRunObject

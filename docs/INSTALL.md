@@ -60,19 +60,37 @@ This v293-to-v295.10 source-compatibility route has not yet been confirmed by a 
 
 Only after the target exporter merges and compiles the source ZIP, the unchanged MFA exports and the device tests pass should the Android package be called complete.
 
-## AssArray subset for Sonic Classic 2
+## AssArraySC2 replacement object for Sonic Classic 2
 
-The Android CI artifact also contains `ASSARRAY.zip`, a separate Java-only package for the five AssArray operations used by Sonic Classic 2. The repository's flat-text `ringdata.sav` is from Sonic Classic 1, not Sonic Classic 2; it is used only as a format fixture for the Java store test and does not establish target-game compatibility. `SC2sf.ini` remains opaque and is not used by that test.
+The project adds **AssArray SC2 Compatible**, a new editor-visible Fusion extension object with its own `ASSARRAYSC2` identity. It is designed for the editor's Replace Object workflow and exposes only the five ACEs used by the Sonic Classic 2 target: Action 0 Set Value at Key, Action 3 Clear the Array, Action 12 Load INI File into Values, Action 14 Save INI File from Values, and Expression 0 `GetValue`. Matching ACE IDs/signatures are intended to preserve those events; no SC1-only ACE union or manual MFA event conversion is in scope.
 
-Build/install the AssArray package with:
+### Windows installation and replacement
+
+From a local MSVC build or the Windows CI artifact, install:
+
+- `edittime/AssArraySC2.mfx` to `<Fusion 2.5>/Extensions/Unicode/AssArraySC2.mfx`
+- `runtime/AssArraySC2.mfx` to `<Fusion 2.5>/Data/Runtime/Unicode/AssArraySC2.mfx`
+
+The independent project is `extensions/AssArraySC2/AssArraySC2.vcxproj`; see [BUILD.md](BUILD.md). The new MFX uses the `lSDK` submodule and its own source/resources. The root `AssArray.mfx` and `AssArrayruntime.mfx` remain untouched prebuilt binaries and are not required to build the replacement.
+
+On a **copy** of the Sonic MFA, use Fusion's Replace Object workflow to select **AssArray SC2 Compatible**. Check that the four targeted actions and `GetValue` remain attached with the same IDs and parameters. CI cannot verify this editor operation; do not treat MFX compilation as proof that the replacement works in the target MFA.
+
+### Android runtime
+
+The Android artifact contains `ASSARRAYSC2.zip`, not `ASSARRAY.zip`. Install it at `<Fusion 2.5>/Data/Runtime/Android/ASSARRAYSC2.zip`. To package/register it with an extracted exporter:
 
 ```sh
-tools/package_assarray_android_extension.sh \
+tools/package_assarray_sc2_android_extension.sh \
   --out build/android-package \
   --install-to "/path/to/Fusion/Data/Runtime/Android"
+
+tools/integrate_assarray_sc2_android_exporter.sh \
+  --exporter /path/to/extracted-Fusion-295.10-project
 ```
 
-For an extracted Android exporter, `tools/integrate_assarray_android_exporter.sh --exporter DIR` copies the Java sources and registers `CRunAssArray` in `CExtLoad.java`. Fusion 295.10 export/device verification remains necessary. The repository has only prebuilt AssArray `.mfx` binaries and no AssArray source project, so the current Windows workflow builds Ini++ MFX files only and cannot compile AssArray MFX files.
+The integration helper copies the new Java runtime and registers `CRunAssArraySC2` for `ASSARRAYSC2` in `CExtLoad.java` without replacing the vendor loader. It is a source/API guard, not a Java/Gradle compile or device test. Fusion 295.10 export and physical-device verification remain required.
+
+`ringdata.sav` is a Sonic Classic 1 flat-text numeric key/value fixture; CI uses it only to test parser/round-trip behavior. It does not establish Sonic Classic 2 save compatibility, and `SC2sf.ini` remains opaque. To obtain a target fixture, run Sonic Classic 2 and trigger its existing Save INI action at the exact path configured in the target MFA; retrieve that actual file from the Android app-private directory or a desktop Fusion run. Test load/save/GetValue against it before claiming target-game compatibility. Do not assume the SC1 filename or format applies.
 
 ## Acceptance checklist
 

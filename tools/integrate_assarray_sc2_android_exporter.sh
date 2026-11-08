@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Integrate the pure-Java AssArray subset into an extracted Fusion Android exporter project.
+# Integrate the pure-Java AssArraySC2 subset into an extracted Fusion Android exporter project.
 # This source/API guard does not replace or overwrite the vendor CExtLoad.java file.
 set -euo pipefail
 
@@ -16,11 +16,11 @@ while [ $# -gt 0 ]; do
         --assemble-debug) ASSEMBLE=1; shift ;;
         -h|--help)
             cat <<'HELP'
-Usage: tools/integrate_assarray_android_exporter.sh --exporter DIR [options]
+Usage: tools/integrate_assarray_sc2_android_exporter.sh --exporter DIR [options]
   --check-only       validate source/API/registration markers without changing files
   --assemble-debug   integrate, then run the exporter's :app:assembleDebug task
 
-Checks Fusion 293.0/295.10 Java API source and registers CRunAssArray in CExtLoad.java.
+Checks Fusion 293.0/295.10 Java API source and registers CRunAssArraySC2 in CExtLoad.java.
 This is not a Fusion MFX build, a Sonic MFA export, or a device test.
 HELP
             exit 0
@@ -103,7 +103,7 @@ for relative, needles in checks.items():
         raise SystemExit(f"error: Fusion {version} Java API mismatch in {path}: missing {missing}")
 
 extload = extload_path.read_text(encoding="utf-8", errors="replace")
-registration = "object=new CRunAssArray();"
+registration = "object=new CRunAssArraySC2();"
 registration_present = registration in extload
 android_branch = re.compile(
     r'else\s+if\s*\(\s*name\.compareToIgnoreCase\s*\(\s*"Android"\s*\)\s*==\s*0\s*\)'
@@ -129,14 +129,14 @@ def copy_without_overwrite(source: pathlib.Path, destination: pathlib.Path) -> N
 
 source_dir = repo_dir / "android" / "java" / "Extensions"
 target_dir = java_root / "Extensions"
-for filename in ("CRunAssArray.java", "AssArrayIniStore.java"):
+for filename in ("CRunAssArraySC2.java", "AssArraySC2IniStore.java"):
     copy_without_overwrite(source_dir / filename, target_dir / filename)
 
 if not registration_present:
     insertion = (
-        '\t\telse if (name.compareToIgnoreCase("ASSARRAY")==0)\n'
+        '\t\telse if (name.compareToIgnoreCase("ASSARRAYSC2")==0)\n'
         '\t\t{\n'
-        '\t\t\tobject=new CRunAssArray();\n'
+        '\t\t\tobject=new CRunAssArraySC2();\n'
         '\t\t}\n'
         '\t\telse if (name.compareToIgnoreCase("Android")==0)'
     )
@@ -144,11 +144,11 @@ if not registration_present:
     if count != 1:
         raise SystemExit("error: CExtLoad patch could not be applied; Java sources were copied, loader left unchanged")
     extload_path.write_text(updated, encoding="utf-8", newline="")
-    print(f"registered CRunAssArray in {extload_path}")
+    print(f"registered CRunAssArraySC2 in {extload_path}")
 else:
     print(f"CExtLoad registration already exists in {extload_path}")
 
-print(f"Integrated AssArray Java sources into: {exporter_dir}")
+print(f"Integrated AssArraySC2 Java sources into: {exporter_dir}")
 print("This integration does not build Windows MFX files or test an exported MFA/device.")
 if assemble:
     wrapper = exporter_dir / "gradlew"

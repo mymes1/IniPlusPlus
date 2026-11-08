@@ -1,12 +1,12 @@
 # Building Ini++
 
-This repository retains the existing Fusion 2.5 Windows MFX and adds an Android Java/JNI source port. The Android code is **not yet a verified release**: host tests pass, but a successful NDK build, Fusion 295.10 source merge/Java compile, normal MFA export and device test have not all been completed.
+This repository retains Ini++'s existing Fusion 2.5 Windows MFX, adds its Android Java/JNI source port, and authors the separate AssArraySC2 replacement object with its own Windows MFX project and Android Java runtime. The new MFX uses independent sources and the `lSDK` submodule; it does not require original AssArray source. Android exporter merge/Java compilation, target MFA export and device tests remain unverified.
 
 ## 1. Targets and exact dependencies
 
 | Component | Target/version | Current verification |
 | --- | --- | --- |
-| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Reproducible MSBuild commands below; the latest Windows CI build still needs to pass. |
+| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Two projects: existing Ini++ and independent AssArraySC2 replacement. CI is configured to build both MFX pairs and check exports; its first run remains pending. |
 | Android C++ shared library | NDK r26.1.10909125, `ndk-build`, C++20, Android API 21; ABIs `arm64-v8a`, `armeabi-v7a`, `x86_64` | Host bridge tests pass. The pinned NDK is installed in CI, but a passing post-fix native build is still required. |
 | Android Java runtime integration | Fusion 2.5 build **295.10** target; Java source API baseline from Fusion **293.0** | Source ZIP is implemented; Fusion 295.10 merge, registration, Java/Gradle compile, MFA export and device run are not yet verified. |
 | Gradle/Android Gradle Plugin | Use Fusion 295.10 exporter's own Gradle wrapper and plugin | The 293.0 reference archive reports Gradle 7.5 / AGP 7.4.2. Do not copy those project settings into the target exporter or assume they prove 295.10 compatibility. |
@@ -41,15 +41,15 @@ This is source-level integration work, not proof that the class registration, JN
 | `android/runtime/Bridge.cpp`, `Bridge.hpp`, `AndroidRuntime.*` | Shared ACE dispatch, edit data, sandbox paths and Android text-file I/O. |
 | `android/fusion/` | Source adaptation types/helper declarations used by the shared C++ code. Not a Clickteam ABI. |
 | `android/tests/BridgeTests.cpp` | Host tests; does not compile JNI or Java. |
-| `android/java/Extensions/CRunAssArray.java`, `AssArrayIniStore.java` | Java-only runtime subset for the five AssArray ACEs used by Sonic Classic 2. |
+| `extensions/AssArraySC2/` | Independent Fusion 2.5 Win32 editor/runtime MFX project, ACE metadata, numeric flat-INI store and host tests for the Replace Object target. |
+| `android/java/Extensions/CRunAssArraySC2.java`, `AssArraySC2IniStore.java` | Android runtime for the separate `ASSARRAYSC2` identity; the Sonic Classic 1 format fixture is tested in `android/tests/AssArraySC2IniStoreTests.java`. |
+| `tools/check_assarray_sc2_extension.py` | Static guard for five ACE IDs/signatures and distinct Windows/Android identity. |
+| `tools/package_assarray_sc2_android_extension.sh`, `tools/integrate_assarray_sc2_android_exporter.sh` | Package/register `ASSARRAYSC2.zip` without replacing Fusion's vendor loader. |
 | `tools/gen_android_aces.py` | Generates/validates Java and C++ ACE parameter/dispatch tables. |
 | `tools/build_android.sh` | NDK native build and JNI export checks. |
 | `tools/integrate_android_exporter.sh` | Optional direct-project source/API check and integration for Ini++ against Fusion 293.0 or 295.10. |
 | `tools/package_android_extension.sh` | Packages/verifies the Ini++ `Data/Runtime/Android` ZIP (`src/Extensions`, `assets/mmf`); refuses missing ABI binaries by default and rejects JAR/AAR/class files. |
-| `tools/package_assarray_android_extension.sh` | Packages the pure-Java AssArray Android subset as `ASSARRAY.zip`. |
-| `tools/integrate_assarray_android_exporter.sh` | Optional source/API check and `CExtLoad` registration for the AssArray subset. |
-| `android/tests/AssArrayIniStoreTests.java` | JDK test of flat numeric INI load/save against `ringdata.sav` from Sonic Classic 1; a format fixture only, not Sonic Classic 2 compatibility evidence. |
-| `ci/workflows/build.yml` | Canonical CI; `.github/workflows/main.yml` is mirrored from it. It builds Ini++ MFXs and Android artifacts, but cannot compile AssArray MFXs without AssArray source. |
+| `ci/workflows/build.yml` | Canonical workflow mirrored to `.github/workflows/main.yml`; configured to build Ini++ and AssArraySC2 MFXs and package Android artifacts. |
 
 ## 4. Host checks (no Fusion/NDK/JDK required)
 
@@ -61,28 +61,30 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The script runs the generator check, compiles `BridgeTests.cpp`, `Bridge.cpp`, the shared runtime/ACEs, the Android path/file layer and Unicode utilities, executes the tests, then smoke-tests the extension ZIP with placeholder `.so` files. Current cases cover:
+The script checks generated ACE metadata and AssArraySC2 signatures, compiles/runs Ini++ `BridgeTests.cpp` and the separate AssArraySC2 numeric-store tests, then smoke-tests both Android package layouts. The Ini++ package test uses placeholder `.so` files. Current cases cover:
 
 - generated ACE count, action/condition argument order and number/string/position dispatch;
 - UTF-8 expression results, numeric return types and the packed X/Y `PARAM_POSITION` encoding;
 - payload-only legacy v1 ANSI (Windows-1252) and v2 Unicode edit data used by the Java adapter;
 - a safe no-op when an object-property ACE receives a placeholder instead of a marshalled Fusion object;
 - autosave, Windows-drive path mapping to a filesDir-relative path, traversal rejection, outside absolute paths and symlink escapes;
-- the Fusion `src/Extensions` + `assets/mmf` ZIP layout, install destination, and exclusion of `.class`/`.jar`/`.aar` and proprietary exporter files (using placeholder, non-runnable `.so` files).
+- the Fusion `src/Extensions` + `assets/mmf` ZIP layout, install destination, and exclusion of `.class`/`.jar`/`.aar` and proprietary exporter files (using placeholder, non-runnable `.so` files);
+- the ASSARRAYSC2 source-package identity/layout and exclusion of original AssArray artifacts;
+- numeric store parsing, ASCII key-case normalization, UTF-8 round-trip, bad-file rejection and valid empty-file behavior.
 
-These C++ tests prove the paths they exercise and the Ini++ package layout only. They do not compile `JniBridge.cpp`, validate 295.10's merge/`CExtLoad` behavior, produce a real APK or establish behavior in a proprietary runtime.
+These host checks do not build the Windows MFX or compile `JniBridge.cpp`, validate Fusion 295.10's merge/`CExtLoad` behavior, produce a real APK, test Replace Object on the target MFA or establish SC2 save compatibility. The store fixture is from Sonic Classic 1 only.
 
-The Android CI job uses JDK 17 to compile the standalone AssArray numeric INI store and test it against the flat `ringdata.sav` format fixture from Sonic Classic 1. This does not test a Sonic Classic 2 save or establish compatibility with the target game:
+The Android CI job is configured to use JDK 17 to test the standalone AssArraySC2 numeric store against the flat Sonic Classic 1 `ringdata.sav` fixture. This does not test a Sonic Classic 2 save or establish target-game compatibility:
 
 ```sh
-mkdir -p build/assarray-tests
-javac -encoding UTF-8 -d build/assarray-tests \
-  android/java/Extensions/AssArrayIniStore.java \
-  android/tests/AssArrayIniStoreTests.java
-java -cp build/assarray-tests Extensions.AssArrayIniStoreTests ringdata.sav
+mkdir -p build/assarraysc2-tests
+javac -encoding UTF-8 -d build/assarraysc2-tests \
+  android/java/Extensions/AssArraySC2IniStore.java \
+  android/tests/AssArraySC2IniStoreTests.java
+java -cp build/assarraysc2-tests Extensions.AssArraySC2IniStoreTests ringdata.sav
 ```
 
-This does not compile `CRunAssArray.java` against Fusion's private Java classes; a local JDK is not installed in this environment.
+This test does not compile `CRunAssArraySC2.java` against Fusion's private Java classes. No local JDK/`javac` is available in this environment.
 
 ## 5. Windows MFX
 
@@ -92,12 +94,15 @@ Run from a Visual Studio 2022 developer prompt with the repository submodule ini
 git submodule update --init --recursive
 msbuild INI++15.vcxproj /m /p:Configuration=Runtime  /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
 msbuild INI++15.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+msbuild extensions/AssArraySC2/AssArraySC2.vcxproj /m /p:Configuration=Runtime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
+msbuild extensions/AssArraySC2/AssArraySC2.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBuildEventUseInBuild=false
 ```
 
 - `Runtime|Win32` builds `Build\Output\Runtime\INI++15.mfx` (install as `INI++.mfx` in `Data\Runtime\Unicode`).
 - `Edittime|Win32` builds `Build\Output\Edittime\INI++15.mfx` (install as `INI++.mfx` in `Extensions\Unicode`).
-- `PostBuildEventUseInBuild=false` disables the local Fusion auto-install post-build step.
-- The existing `windows-mfx` CI job builds Ini++ only. The checkout contains prebuilt `AssArray.mfx` and `AssArrayruntime.mfx` binaries, but no AssArray solution/project, C/C++ source or resources; a real AssArray MFX build job requires the original source project and SDK dependencies.
+- AssArraySC2 outputs `build\mfx\AssArraySC2\Runtime\AssArraySC2.mfx` and `build\mfx\AssArraySC2\Edittime\AssArraySC2.mfx`; install to `<Fusion>\Data\Runtime\Unicode` and `<Fusion>\Extensions\Unicode`, respectively.
+- The new project uses the initialized `lSDK` submodule and owns its sources/resources; it does not include or rebuild the original prebuilt AssArray MFX files and does not require original source.
+- `PostBuildEventUseInBuild=false` disables local Fusion auto-install. Windows CI is configured to build both MFX projects and check exports; the first run remains pending.
 
 ## 6. Android native/JNI build
 
@@ -177,7 +182,7 @@ The canonical workflow is `.github/workflows/main.yml`; `ci/workflows/build.yml`
 tools/sync_workflow.sh --check
 ```
 
-CI runs the generator/host tests (including ASan/UBSan), builds Ini++ MSVC Win32 MFXs, and builds Android JNI libraries. The Android CI job also tests the standalone AssArray store against the Sonic Classic 1 format fixture and packages `ASSARRAY.zip`; it does not compile the full adapter against Fusion or build AssArray MFXs. The workflow uploads separate Windows and Android artifacts. It cannot access the user's licensed 295.10 exporter source or Sonic MFA, so it must not claim a complete export or publish a verified release bundle. Workflow changes under `.github/workflows/` require the GitHub token used to push to have the workflow-scoped permission; if push is rejected for that reason, reconnect GitHub in Arena with that permission.
+The configured workflow is intended to run generator/host tests (including ASan/UBSan), build Ini++ and AssArraySC2 MSVC Win32 MFX pairs, and build Android JNI libraries. Android CI tests the standalone Java store against the Sonic Classic 1 fixture and packages `ASSARRAYSC2.zip`; it does not compile the full adapter against Fusion, export the target MFA, or test an SC2 save/device. No CI run for this branch has been verified yet. The workflow is configured to upload separate Windows and Android artifacts and cannot access the licensed 295.10 exporter or Sonic MFA. Workflow changes under `.github/workflows/` require the GitHub token used to push to have the workflow-scoped permission; if push is rejected for that reason, reconnect GitHub in Arena with that permission.
 
 The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input; it must not be copied into generated ZIPs or artifacts. For click-by-click workflow triggering, artifact download, and Windows/Android integration steps, see [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
 
@@ -186,7 +191,7 @@ The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input
 | Symptom | Meaning / next step |
 | --- | --- |
 | `ndk-build was not found` | Install NDK r26.1.10909125 and set `ANDROID_NDK_HOME`, or pass `--ndk`. |
-| Integration rejects an exporter version | The direct-project helper accepts only Fusion 293.0/295.10 labels and checks the API surface. Use the target exporter and inspect the reported missing member; do not bypass the guard. |
+| Integration rejects an exporter version | Each direct-project helper accepts only inspected Fusion 293.0/295.10 labels and checks the API surface. Use the target exporter and inspect the reported missing member; do not bypass the guard. |
 | Integration reports missing `CExtLoad` or Java API members | Exporter source layout/API differs. Stop and compare the actual target API; do not copy/replace a vendor loader from another version. |
 | `tools/package_android_extension.sh` reports missing ABI libraries | Run a real NDK build for the configured ABIs. An incomplete ZIP is source-only, marked incomplete and cannot be installed. |
 | Gradle/JDK fails | Use the Java/Gradle/AGP versions supplied by the target Fusion 295.10 exporter. The 293.0 reference project's configuration is not copied to the package. |

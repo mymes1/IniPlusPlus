@@ -1,8 +1,8 @@
-// Numeric INI-backed store for the five AssArray ACEs used by Sonic Classic 2.
+// Numeric INI-backed store for the separate ASSARRAYSC2 Android runtime.
 //
-// This implements the flat key=value form in ringdata.sav from Sonic Classic 1. That file is
-// only a format fixture and does not establish Sonic Classic 2 save compatibility. It does not
-// emulate the original AssArray String map, binary array files, encryption, or unrelated ACEs.
+// This implements a flat numeric key=value subset and uses ringdata.sav from Sonic Classic 1 only
+// as a parser/round-trip format fixture, not as evidence of Sonic Classic 2 save compatibility.
+// String values, binary array files, encryption, and unrelated ACEs are outside this subset.
 package Extensions;
 
 import java.io.ByteArrayOutputStream;
@@ -17,13 +17,13 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-final class AssArrayIniStore {
+final class AssArraySC2IniStore {
     private static final int MAX_FILE_BYTES = 16 * 1024 * 1024;
 
     private final File filesDirectory;
     private final LinkedHashMap<String, Double> values = new LinkedHashMap<String, Double>();
 
-    AssArrayIniStore(File appFilesDirectory) {
+    AssArraySC2IniStore(File appFilesDirectory) {
         filesDirectory = appFilesDirectory;
     }
 
@@ -53,7 +53,6 @@ final class AssArrayIniStore {
 
             String text = readText(file);
             LinkedHashMap<String, Double> loaded = new LinkedHashMap<String, Double>();
-            boolean sawSection = false;
             boolean sawAssignment = false;
             boolean sawOtherContent = false;
             String[] lines = text.split("\\r\\n|\\n|\\r", -1);
@@ -63,7 +62,6 @@ final class AssArrayIniStore {
                     continue;
                 }
                 if (line.charAt(0) == '[' && line.charAt(line.length() - 1) == ']') {
-                    sawSection = true;
                     continue;
                 }
 
@@ -88,7 +86,7 @@ final class AssArrayIniStore {
             // Reject opaque or non-numeric data rather than treating it as an empty save and
             // clearing the in-memory array. A valid empty file/comment-only file remains loadable.
             if (loaded.isEmpty() && (sawAssignment || sawOtherContent)
-                    && !sawSection && text.trim().length() != 0) {
+                    && text.trim().length() != 0) {
                 return false;
             }
             values.clear();

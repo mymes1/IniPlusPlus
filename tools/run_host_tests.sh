@@ -10,6 +10,7 @@ BUILD="${BUILD_DIR:-build/android-bridge-tests}"
 SANITIZE="${SANITIZE:-0}"
 
 python3 tools/gen_android_aces.py --check
+python3 tools/check_assarray_sc2_extension.py
 mkdir -p "$BUILD"
 if [ "$SANITIZE" = 1 ]; then
 	BUILD="$BUILD/asan"
@@ -34,4 +35,15 @@ fi
 
 "$BUILD/bridge-tests"
 
+STORE_FLAGS=(-std=c++17 -O1 -g -Wall -Wextra -Werror -Iextensions/AssArraySC2)
+if [ "$SANITIZE" = 1 ]; then
+	STORE_FLAGS+=(-fsanitize=address,undefined -fno-omit-frame-pointer)
+fi
+"$CXX" "${STORE_FLAGS[@]}" \
+    extensions/AssArraySC2/AssArraySC2Store.cpp \
+    extensions/AssArraySC2/tests/AssArraySC2StoreTests.cpp \
+    -o "$BUILD/assarraysc2-store-tests"
+"$BUILD/assarraysc2-store-tests" "$PWD/ringdata.sav"
+
 bash tools/test_android_package.sh
+bash tools/test_assarray_sc2_package.sh
