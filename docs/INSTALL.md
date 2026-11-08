@@ -60,6 +60,20 @@ This v293-to-v295.10 source-compatibility route has not yet been confirmed by a 
 
 Only after the target exporter merges and compiles the source ZIP, the unchanged MFA exports and the device tests pass should the Android package be called complete.
 
+## AssArray subset for Sonic Classic 2
+
+The Android CI artifact also contains `ASSARRAY.zip`, a separate Java-only package for the five AssArray operations used by Sonic Classic 2. The repository's flat-text `ringdata.sav` is from Sonic Classic 1, not Sonic Classic 2; it is used only as a format fixture for the Java store test and does not establish target-game compatibility. `SC2sf.ini` remains opaque and is not used by that test.
+
+Build/install the AssArray package with:
+
+```sh
+tools/package_assarray_android_extension.sh \
+  --out build/android-package \
+  --install-to "/path/to/Fusion/Data/Runtime/Android"
+```
+
+For an extracted Android exporter, `tools/integrate_assarray_android_exporter.sh --exporter DIR` copies the Java sources and registers `CRunAssArray` in `CExtLoad.java`. Fusion 295.10 export/device verification remains necessary. The repository has only prebuilt AssArray `.mfx` binaries and no AssArray source project, so the current Windows workflow builds Ini++ MFX files only and cannot compile AssArray MFX files.
+
 ## Acceptance checklist
 
 - [ ] Windows runtime and edittime MFX build and load in Fusion 2.5 Unicode.

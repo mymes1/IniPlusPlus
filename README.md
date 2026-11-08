@@ -14,6 +14,12 @@ That source-compatible route is **not yet validated as a Fusion 295.10 extension
 
 Therefore do not call Android support complete or claim the Sonic MFA exports. Keep the existing MFA events unchanged for the acceptance test, but verify all ACEs that MFA actually uses before release.
 
+## Separate AssArray Android subset for Sonic Classic 2
+
+A Java adapter targets the five AssArray ACEs used by the supplied Sonic Classic 2 export: Set Value at Key, Clear, Load INI into Values, Save INI from Values, and `GetValue`. The checked-in `ringdata.sav` is a flat key/value sample from Sonic Classic 1; CI uses it only as a format fixture, not as evidence of Sonic Classic 2 save compatibility. `SC2sf.ini` remains opaque and is not used by the test. See [AssArray Android notes](docs/ASSARRAY_ANDROID.md) for implementation scope and test limits.
+
+The root AssArray `.mfx` files are already-compiled binaries. There is no AssArray `.sln`, `.vcxproj`, or C/C++ source in this checkout, so a workflow cannot compile new AssArray MFXs yet. The CI workflow packages the Android subset; a Windows MFX compile job needs the AssArray source project first.
+
 ## Verification available now
 
 ```sh
@@ -22,7 +28,7 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The host tests cover shared ACE dispatch, current-group parameter order, UTF-8 results, numeric/packed-position values, edit-data payload handling, autosave and path traversal/symlink confinement. The host test runner also smoke-tests the Android extension ZIP paths and verifies it contains no `.jar`/`.aar`/`.class` or exporter archive. These checks do **not** compile JNI/Java or prove exporter/APK loading.
+The C++ host tests cover shared ACE dispatch, current-group parameter order, UTF-8 results, numeric/packed-position values, edit-data payload handling, autosave and path traversal/symlink confinement. The Android CI job also compiles/tests the standalone AssArray INI store against the Sonic Classic 1 `ringdata.sav` format fixture and packages `ASSARRAY.zip`; this does **not** verify Sonic Classic 2 save compatibility. CI still does **not** compile the full Java adapter against Fusion 295.10, verify exporter registration, or prove APK/device loading.
 
 ## Build outline
 
@@ -54,9 +60,11 @@ Exact commands, Java/Gradle toolchain boundaries, compatibility notes and limita
 - `android/jni/`: JNI bridge and NDK module setup.
 - `android/runtime/`, `android/fusion/`: platform file/edit-data support, bridge and shared-source compatibility types.
 - `android/tests/BridgeTests.cpp`: Java/JNI-independent host tests.
+- `android/java/Extensions/CRunAssArray.java` and `AssArrayIniStore.java`: five-ACE Android compatibility adapter for Sonic Classic 2; the flat Sonic Classic 1 `ringdata.sav` format fixture is checked by `android/tests/AssArrayIniStoreTests.java` in CI.
 - `tools/gen_android_aces.py`: generated parameter/dispatch tables from `Menus.cpp` and `ACEs.cpp`.
-- `tools/package_android_extension.sh`: creates and verifies the `Data/Runtime/Android` source/assets ZIP.
-- `.github/workflows/main.yml`: CI entry point (mirrored from `ci/workflows/build.yml`); CI builds host tests, Windows MFX and Android JNI libraries, but cannot run Fusion's private exporter or export/test the Sonic MFA.
+- `tools/package_android_extension.sh`: creates and verifies the Ini++ `Data/Runtime/Android` source/assets ZIP.
+- `tools/package_assarray_android_extension.sh` and `tools/integrate_assarray_android_exporter.sh`: package/register the Java-only AssArray Android subset; neither builds Windows MFX files.
+- `.github/workflows/main.yml`: CI entry point (mirrored from `ci/workflows/build.yml`); it builds Ini++ MFXs and Android artifacts, but cannot run Fusion's private exporter or export/test the Sonic MFA.
 
 ## Acceptance test still required
 

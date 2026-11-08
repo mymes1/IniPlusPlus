@@ -55,7 +55,7 @@ jobs:
         run: bash tools/sync_workflow.sh --check
 
   android-jni:
-    name: Android JNI libraries and overlay
+    name: Android JNI libraries and source overlays
     runs-on: ubuntu-22.04
     timeout-minutes: 40
 
@@ -70,11 +70,19 @@ jobs:
 
       # JDK 17 is used by sdkmanager here. It is not a validated JDK for
       # the Fusion 295.10 Gradle exporter.
-      - name: Install Java for Android SDK tools
+      - name: Install Java for Android SDK tools and AssArray store tests
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Compile and test AssArray INI store against Sonic Classic 1 format fixture
+        run: |
+          mkdir -p build/assarray-tests
+          javac -encoding UTF-8 -d build/assarray-tests \
+            android/java/Extensions/AssArrayIniStore.java \
+            android/tests/AssArrayIniStoreTests.java
+          java -cp build/assarray-tests Extensions.AssArrayIniStoreTests ringdata.sav
 
       - name: Install Android SDK command-line tools
         uses: android-actions/setup-android@v3
@@ -118,19 +126,23 @@ jobs:
       - name: Build JNI libraries for all configured ABIs
         run: tools/build_android.sh --out build/android
 
-      - name: Package project-owned Android overlay
+      - name: Package Ini++ Android overlay
         run: |
           tools/package_android_extension.sh \
             --android-dir build/android \
             --out build/android-package
 
-      - name: Upload Android native libraries and overlay
+      - name: Package AssArray Android compatibility subset
+        run: tools/package_assarray_android_extension.sh --out build/android-package
+
+      - name: Upload Android native libraries and overlays
         uses: actions/upload-artifact@v4
         with:
           name: android-jni-overlay-unverified
           path: |
             build/android/assets/mmf/**/libIniPlusPlusBridge.so
             build/android-package/INI++.zip
+            build/android-package/ASSARRAY.zip
           if-no-files-found: error
           retention-days: 30
 

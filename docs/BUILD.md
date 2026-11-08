@@ -41,11 +41,15 @@ This is source-level integration work, not proof that the class registration, JN
 | `android/runtime/Bridge.cpp`, `Bridge.hpp`, `AndroidRuntime.*` | Shared ACE dispatch, edit data, sandbox paths and Android text-file I/O. |
 | `android/fusion/` | Source adaptation types/helper declarations used by the shared C++ code. Not a Clickteam ABI. |
 | `android/tests/BridgeTests.cpp` | Host tests; does not compile JNI or Java. |
+| `android/java/Extensions/CRunAssArray.java`, `AssArrayIniStore.java` | Java-only runtime subset for the five AssArray ACEs used by Sonic Classic 2. |
 | `tools/gen_android_aces.py` | Generates/validates Java and C++ ACE parameter/dispatch tables. |
 | `tools/build_android.sh` | NDK native build and JNI export checks. |
-| `tools/integrate_android_exporter.sh` | Optional direct-project source/API check and integration for Fusion 293.0 or 295.10; inserts the class in the target `CExtLoad.java` without overwriting it. |
-| `tools/package_android_extension.sh` | Packages/verifies the `Data/Runtime/Android` ZIP (`src/Extensions`, `assets/mmf`); refuses missing ABI binaries by default and rejects JAR/AAR/class files. |
-| `ci/workflows/build.yml` | Canonical CI; `.github/workflows/main.yml` is mirrored from it. |
+| `tools/integrate_android_exporter.sh` | Optional direct-project source/API check and integration for Ini++ against Fusion 293.0 or 295.10. |
+| `tools/package_android_extension.sh` | Packages/verifies the Ini++ `Data/Runtime/Android` ZIP (`src/Extensions`, `assets/mmf`); refuses missing ABI binaries by default and rejects JAR/AAR/class files. |
+| `tools/package_assarray_android_extension.sh` | Packages the pure-Java AssArray Android subset as `ASSARRAY.zip`. |
+| `tools/integrate_assarray_android_exporter.sh` | Optional source/API check and `CExtLoad` registration for the AssArray subset. |
+| `android/tests/AssArrayIniStoreTests.java` | JDK test of flat numeric INI load/save against `ringdata.sav` from Sonic Classic 1; a format fixture only, not Sonic Classic 2 compatibility evidence. |
+| `ci/workflows/build.yml` | Canonical CI; `.github/workflows/main.yml` is mirrored from it. It builds Ini++ MFXs and Android artifacts, but cannot compile AssArray MFXs without AssArray source. |
 
 ## 4. Host checks (no Fusion/NDK/JDK required)
 
@@ -66,7 +70,19 @@ The script runs the generator check, compiles `BridgeTests.cpp`, `Bridge.cpp`, t
 - autosave, Windows-drive path mapping to a filesDir-relative path, traversal rejection, outside absolute paths and symlink escapes;
 - the Fusion `src/Extensions` + `assets/mmf` ZIP layout, install destination, and exclusion of `.class`/`.jar`/`.aar` and proprietary exporter files (using placeholder, non-runnable `.so` files).
 
-These tests prove the tested C++ paths and packaging structure only. They do not compile `JniBridge.cpp`, invoke `javac`/Gradle, validate 295.10's merge/`CExtLoad` behavior, produce a real APK or establish behavior in a proprietary runtime.
+These C++ tests prove the paths they exercise and the Ini++ package layout only. They do not compile `JniBridge.cpp`, validate 295.10's merge/`CExtLoad` behavior, produce a real APK or establish behavior in a proprietary runtime.
+
+The Android CI job uses JDK 17 to compile the standalone AssArray numeric INI store and test it against the flat `ringdata.sav` format fixture from Sonic Classic 1. This does not test a Sonic Classic 2 save or establish compatibility with the target game:
+
+```sh
+mkdir -p build/assarray-tests
+javac -encoding UTF-8 -d build/assarray-tests \
+  android/java/Extensions/AssArrayIniStore.java \
+  android/tests/AssArrayIniStoreTests.java
+java -cp build/assarray-tests Extensions.AssArrayIniStoreTests ringdata.sav
+```
+
+This does not compile `CRunAssArray.java` against Fusion's private Java classes; a local JDK is not installed in this environment.
 
 ## 5. Windows MFX
 
@@ -81,7 +97,7 @@ msbuild INI++15.vcxproj /m /p:Configuration=Edittime /p:Platform=Win32 /p:PostBu
 - `Runtime|Win32` builds `Build\Output\Runtime\INI++15.mfx` (install as `INI++.mfx` in `Data\Runtime\Unicode`).
 - `Edittime|Win32` builds `Build\Output\Edittime\INI++15.mfx` (install as `INI++.mfx` in `Extensions\Unicode`).
 - `PostBuildEventUseInBuild=false` disables the local Fusion auto-install post-build step.
-- The Windows MFX has not been built as part of this continuation. Do not claim it was revalidated until the MSBuild/CI job passes.
+- The existing `windows-mfx` CI job builds Ini++ only. The checkout contains prebuilt `AssArray.mfx` and `AssArrayruntime.mfx` binaries, but no AssArray solution/project, C/C++ source or resources; a real AssArray MFX build job requires the original source project and SDK dependencies.
 
 ## 6. Android native/JNI build
 
@@ -161,7 +177,7 @@ The canonical workflow is `.github/workflows/main.yml`; `ci/workflows/build.yml`
 tools/sync_workflow.sh --check
 ```
 
-CI is intended to run the generator/host tests (including ASan/UBSan), MSVC Win32 MFX builds, and the NDK JNI build, uploading **separate** Windows and Android-native/source artifacts. It cannot access the user's licensed 295.10 exporter source or Sonic MFA, so it must not claim a complete export or publish a verified release bundle. Workflow changes under `.github/workflows/` require the GitHub token used to push to have the workflow-scoped permission; if push is rejected for that reason, reconnect GitHub in Arena with that permission.
+CI runs the generator/host tests (including ASan/UBSan), builds Ini++ MSVC Win32 MFXs, and builds Android JNI libraries. The Android CI job also tests the standalone AssArray store against the Sonic Classic 1 format fixture and packages `ASSARRAY.zip`; it does not compile the full adapter against Fusion or build AssArray MFXs. The workflow uploads separate Windows and Android artifacts. It cannot access the user's licensed 295.10 exporter source or Sonic MFA, so it must not claim a complete export or publish a verified release bundle. Workflow changes under `.github/workflows/` require the GitHub token used to push to have the workflow-scoped permission; if push is rejected for that reason, reconnect GitHub in Arena with that permission.
 
 The proprietary `AndroidSDK_Gradle.zip` stays at the repository root as an input; it must not be copied into generated ZIPs or artifacts. For click-by-click workflow triggering, artifact download, and Windows/Android integration steps, see [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
 
