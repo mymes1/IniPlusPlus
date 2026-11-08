@@ -2,7 +2,7 @@
 
 ## Important status: Android is not a verified install yet
 
-The workflow is configured to run shared-C++ host tests, build Ini++ Windows MFX files and the independent AssArraySC2 editor/runtime MFX pair, and compile/test the standalone AssArraySC2 numeric INI store against the Sonic Classic 1 `ringdata.sav` format fixture before packaging `ASSARRAYSC2.zip`. No CI run has yet verified the configured workflow on this branch, including the new Windows MFX project. The workflow does **not** compile the full Android adapter with the Fusion 2.5 build 295.10 exporter, test an SC2 save, export the Sonic MFA, or produce a device-tested APK. The Android ZIP remains **unverified in the target exporter**.
+CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) passed all jobs: shared-C++ host/sanitizer tests, Ini++ and AssArraySC2 Windows MFX builds, the standalone AssArraySC2 numeric INI store test against the Sonic Classic 1 `ringdata.sav` fixture, Android JNI builds, and ZIP packaging. This does **not** compile the full Android adapter with the Fusion 2.5 build 295.10 exporter, test an SC2 save, export the Sonic MFA, or produce a device-tested APK. The Android ZIP remains **unverified in the target exporter**.
 
 The repository's `AndroidSDK_Gradle.zip` identifies as Fusion 293.0 and is used only as a Java API reference. Android packages are designed for the Fusion 295.10 exporter to merge and compile source; its Gradle/SDK configuration and AndroidX dependencies are not bundled. Ini++ object references/custom-parameter payloads also remain unimplemented; see [COMPATIBILITY.md](COMPATIBILITY.md). Do not treat a green workflow run as proof that Android support is complete.
 

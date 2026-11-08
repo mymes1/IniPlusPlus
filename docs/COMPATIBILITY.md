@@ -21,7 +21,7 @@ The root `AndroidSDK_Gradle.zip` identifies as Fusion 293.0 (Gradle 7.5 / AGP 7.
 
 The generated table currently contains **84 actions, 20 conditions and 41 expressions**, matching the checked-in `Menus.cpp` / `ACEs.cpp` declarations and order. The host test covers representative string/number/condition/current-group/position dispatch. Run `python3 tools/gen_android_aces.py --check` after ACE edits.
 
-The Windows MFX project, Windows editor files, icon, object identifier and resource strings are kept in the tree; Android changes use separate Java/JNI/platform sources and `FUSION_ANDROID_RUNTIME` guards. The Windows MFX has **not** been built in this continuation, so Windows non-regression is not yet established by a build result.
+The Windows MFX project, Windows editor files, icon, object identifier and resource strings are kept in the tree; Android changes use separate Java/JNI/platform sources and `FUSION_ANDROID_RUNTIME` guards. CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) passed the existing Ini++ and independent AssArraySC2 Runtime/Edittime MFX builds and artifact checks. This does not exercise the Fusion editor or target MFA.
 
 The Android deserializer retains the shared v1 ANSI and v2 Unicode edit-data format. The bridge accepts either a full `extHeader`-prefixed blob or a payload-only byte array. The current host tests cover payload-only v1 ANSI data (Windows-1252) and v2 Unicode data; the target runtime's precise pointer convention still needs a compatible 295.10 exporter test. Do not infer successful MFA object-data loading from the host test alone.
 
@@ -63,11 +63,12 @@ Java expression APIs produce `CValue` objects and the JNI bridge preserves strin
 | Android extension ZIP smoke test | Passed locally; checks the Clickteam `src/Extensions` + `assets/mmf` paths, install destination and absence of JAR/AAR/vendor files using dummy libraries only. Not a Fusion merge test. |
 | `bash tools/sync_workflow.sh --check` | Passed locally; `.github/workflows/main.yml` matches `ci/workflows/build.yml`. |
 | Fusion 293.0 Java API source check | Passed against the available archive with `tools/integrate_android_exporter.sh --check-only` and a test-only placeholder `.so`. This is not `javac` or Gradle. |
-| CI run 38041243939 | Host tests passed; Android native build and Windows MFX jobs failed. Android SDK/NDK installation succeeded. The remaining compiler diagnostics are not available in this workspace. |
-| NDK build of `libIniPlusPlusBridge.so` | CI attempted but no passing post-fix build result is available; local NDK is absent. No verified Android `.so` artifact is established. |
+| CI run 38041243939 | Earlier run: host tests passed; Android native build and Windows MFX jobs failed. Android SDK/NDK installation succeeded. |
+| CI run 42492164267 | Passed all jobs, including Ini++ and AssArraySC2 Windows MFX builds, host/sanitizer tests, standalone Java store tests, Android JNI builds for all ABIs, and package checks. |
+| NDK build of `libIniPlusPlusBridge.so` | CI run 42492164267 built the libraries for all configured ABIs; no local NDK build or device-load test was performed. |
 | Java compile against Fusion 295.10 | Not run; no local `javac` or 295.10 exporter source. The 293.0 API checks are not a 295.10 compile. |
 | Exporter ZIP merge/registration/Gradle build | Not validated. The `Data/Runtime/Android` source-package merge and target `CExtLoad` registration need an actual Fusion 295.10 export test. |
-| Windows Runtime/Edittime MFX build | CI attempted but latest MFX job failed; a successful post-fix run is still required. |
+| Windows Runtime/Edittime MFX build | CI run 42492164267 passed the Ini++ and AssArraySC2 Runtime/Edittime MFX builds and required export checks. No Fusion editor/MFA smoke test was performed. |
 | Fusion export of the Sonic MFA to an APK | Not performed. |
 | APK install and device test, including file compatibility and ACE behavior | Not performed. |
 

@@ -20,7 +20,7 @@ This branch authors a **new, editor-visible Fusion extension object** named **As
 
 `ringdata.sav` is a flat key/value fixture from Sonic Classic 1; CI uses it only to exercise numeric INI parsing/round-tripping, not as evidence of Sonic Classic 2 save compatibility. `SC2sf.ini` remains opaque. No target-game save compatibility is claimed until a Sonic Classic 2 sample is generated/located and tested. See [AssArraySC2 notes](docs/ASSARRAY_SC2.md) for ACE mappings, MFX build/install, Android packaging, and verification limits.
 
-The root `AssArray.mfx` and `AssArrayruntime.mfx` files remain the original prebuilt binaries; the new project's own sources/resources live under `extensions/AssArraySC2/` and use the initialized `lSDK` submodule, not those binaries. CI is configured to build the new MFX pair and package its Android runtime under the distinct name `ASSARRAYSC2.zip`; no CI/MSVC run has yet verified that build.
+The root `AssArray.mfx` and `AssArrayruntime.mfx` files remain the original prebuilt binaries; the new project's own sources/resources live under `extensions/AssArraySC2/` and use the initialized `lSDK` submodule, not those binaries. CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) passed the new Runtime/Edittime MFX builds and export checks, and packaged the Android runtime as the distinct `ASSARRAYSC2.zip`. This is a build/package result, not a Fusion Replace Object or target-save test.
 
 ## Verification available now
 
@@ -30,7 +30,7 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The C++ host tests cover Ini++ dispatch and sandbox behavior plus the independent AssArraySC2 numeric store; the latter is tested against the Sonic Classic 1 `ringdata.sav` format fixture only. The Windows CI job is configured to build the new AssArraySC2 editor/runtime MFX pair, but its first run remains pending. Android CI is configured to compile/test the Java store and package `ASSARRAYSC2.zip`; it does **not** compile the full adapter against Fusion 295.10, export the target MFA, or prove device loading/save compatibility.
+The C++ host tests cover Ini++ dispatch and sandbox behavior plus the independent AssArraySC2 numeric store; the latter is tested against the Sonic Classic 1 `ringdata.sav` format fixture only. CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) passed the Windows MFX, host/sanitizer, Android JNI, store-test and package jobs. Android CI still does **not** compile the full adapter against Fusion 295.10, export the target MFA, or prove device loading/save compatibility.
 
 ## Build outline
 

@@ -35,7 +35,7 @@ Outputs:
 - `build/mfx/AssArraySC2/Runtime/AssArraySC2.mfx` → `<Fusion 2.5>/Data/Runtime/Unicode/AssArraySC2.mfx`
 - `build/mfx/AssArraySC2/Edittime/AssArraySC2.mfx` → `<Fusion 2.5>/Extensions/Unicode/AssArraySC2.mfx`
 
-The MFX advertises Fusion build 295 compatibility. Windows CI is configured to build both configurations and check required exports, but no CI/MSVC build has yet verified this project. Even a successful CI build is not a Fusion editor/runtime smoke test.
+The MFX advertises Fusion build 295 compatibility. Windows CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) successfully built Runtime and Edittime and passed the required export checks. This validates compilation/artifact checks only; it is not a Fusion editor/runtime smoke test.
 
 ### Fusion Replace Object workflow
 
@@ -89,4 +89,4 @@ bash tools/run_host_tests.sh
 SANITIZE=1 bash tools/run_host_tests.sh
 ```
 
-The static guard checks the ACE IDs/signatures and distinct identity. Host tests compile/test the portable numeric store using Sonic Classic 1 `ringdata.sav`, and smoke-test the Android ZIP layout. Windows CI is configured to compile the MFX project; Android CI is configured to compile/test the standalone Java store and package the runtime. No CI run is verified yet. None of these checks establishes SC2 save compatibility or proves Replace Object on the target MFA.
+The static guard checks the ACE IDs/signatures and distinct identity. Host tests compile/test the portable numeric store using Sonic Classic 1 `ringdata.sav`, and smoke-test the Android ZIP layout. CI run [42492164267](https://github.com/mymes1/IniPlusPlus/actions/runs/42492164267) passed Windows MFX compilation/export checks, host tests, the standalone Java store test and Android packaging. None of these checks establishes SC2 save compatibility or proves Replace Object on the target MFA.
