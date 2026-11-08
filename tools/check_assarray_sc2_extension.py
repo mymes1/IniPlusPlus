@@ -76,6 +76,10 @@ require({"Runtime", "Edittime"}.issubset(configurations), "MFX project must defi
 project_text = (MFX / "AssArraySC2.vcxproj").read_text(encoding="utf-8")
 require("mmfs2u.lib" in project_text and "lSDK\\include" in project_text,
         "independent MFX project must use the checked-in Fusion SDK only")
+require(project_text.count("<LanguageStandard>stdcpp20</LanguageStandard>") == 3,
+        "all MFX configurations must use C++20 for lSDK FusionMenu's std::span")
+require(project_text.count("<ConformanceMode>false</ConformanceMode>") == 3,
+        "all MFX configurations must use MSVC permissive lookup for lSDK FusionParams")
 require("AssArray.mfx" not in project_text and "AssArrayruntime.mfx" not in project_text,
         "new MFX project must not require original AssArray binaries")
 

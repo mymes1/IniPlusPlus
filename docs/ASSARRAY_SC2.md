@@ -20,7 +20,7 @@ Matching IDs/signatures are intended to preserve the relevant events during Repl
 
 ## Independent Windows project
 
-`extensions/AssArraySC2/AssArraySC2.sln` and `AssArraySC2.vcxproj` are an independently authored Win32 editor/runtime MFX project. It owns its ACE menus/metadata, runtime dispatch, resources, icon and numeric flat-INI store. It builds against the initialized `lSDK` submodule and does not include, link, modify or require original AssArray source or the root prebuilt `AssArray.mfx`/`AssArrayruntime.mfx` binaries. Those original files remain untouched.
+`extensions/AssArraySC2/AssArraySC2.sln` and `AssArraySC2.vcxproj` are an independently authored Win32 editor/runtime MFX project. It owns its ACE menus/metadata, runtime dispatch, resources, icon and numeric flat-INI store. It builds against the initialized `lSDK` submodule and does not include, link, modify or require original AssArray source or the root prebuilt `AssArray.mfx`/`AssArrayruntime.mfx` binaries. Those original files remain untouched. The project uses C++20 (`std::span` is used by the pinned lSDK) and MSVC permissive mode (`ConformanceMode=false`), matching the lSDK example project; the lSDK `FusionParams` helper relies on MSVC's permissive dependent-base member lookup.
 
 From a Visual Studio 2022 developer prompt:
 

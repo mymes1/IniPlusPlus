@@ -6,7 +6,7 @@ This repository retains Ini++'s existing Fusion 2.5 Windows MFX, adds its Androi
 
 | Component | Target/version | Current verification |
 | --- | --- | --- |
-| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Two projects: existing Ini++ and independent AssArraySC2 replacement. CI is configured to build both MFX pairs and check exports; its first run remains pending. |
+| Windows runtime and edittime MFX | Fusion 2.5 Unicode, Win32; Visual Studio 2022, MSVC v143, Windows SDK 10 | Two projects: existing Ini++ and independent AssArraySC2 replacement. CI builds both MFX pairs and checks exports; AssArraySC2 uses C++20 and the pinned lSDK's MSVC permissive mode. |
 | Android C++ shared library | NDK r26.1.10909125, `ndk-build`, C++20, Android API 21; ABIs `arm64-v8a`, `armeabi-v7a`, `x86_64` | Host bridge tests pass. The pinned NDK is installed in CI, but a passing post-fix native build is still required. |
 | Android Java runtime integration | Fusion 2.5 build **295.10** target; Java source API baseline from Fusion **293.0** | Source ZIP is implemented; Fusion 295.10 merge, registration, Java/Gradle compile, MFA export and device run are not yet verified. |
 | Gradle/Android Gradle Plugin | Use Fusion 295.10 exporter's own Gradle wrapper and plugin | The 293.0 reference archive reports Gradle 7.5 / AGP 7.4.2. Do not copy those project settings into the target exporter or assume they prove 295.10 compatibility. |
@@ -101,8 +101,8 @@ msbuild extensions/AssArraySC2/AssArraySC2.vcxproj /m /p:Configuration=Edittime 
 - `Runtime|Win32` builds `Build\Output\Runtime\INI++15.mfx` (install as `INI++.mfx` in `Data\Runtime\Unicode`).
 - `Edittime|Win32` builds `Build\Output\Edittime\INI++15.mfx` (install as `INI++.mfx` in `Extensions\Unicode`).
 - AssArraySC2 outputs `build\mfx\AssArraySC2\Runtime\AssArraySC2.mfx` and `build\mfx\AssArraySC2\Edittime\AssArraySC2.mfx`; install to `<Fusion>\Data\Runtime\Unicode` and `<Fusion>\Extensions\Unicode`, respectively.
-- The new project uses the initialized `lSDK` submodule and owns its sources/resources; it does not include or rebuild the original prebuilt AssArray MFX files and does not require original source.
-- `PostBuildEventUseInBuild=false` disables local Fusion auto-install. Windows CI is configured to build both MFX projects and check exports; the first run remains pending.
+- The new project uses the initialized `lSDK` submodule and owns its sources/resources; it does not include or rebuild the original prebuilt AssArray MFX files and does not require original source. Its project settings use C++20 for `std::span` and `<ConformanceMode>false</ConformanceMode>` to match lSDK's `FusionParams` template lookup requirements.
+- `PostBuildEventUseInBuild=false` disables local Fusion auto-install. Windows CI builds both MFX projects and checks exports.
 
 ## 6. Android native/JNI build
 
