@@ -14,7 +14,7 @@ The editor exposes only the five operations used by the Sonic Classic 2 event se
 | Save INI File from Values | Action 14 | `PARAM_EXPSTRING` path | Saves a flat numeric `key=value` file. |
 | `GetValue` | Expression 0 | `EXPPARAM_STRING` key | Returns the numeric value, or zero if missing. |
 
-These IDs and parameter types match the selected AssArray ACE metadata used by the SC2 target. The MFX reserves dispatch slots through Action 14 and keeps the original 12-condition table extent; these are table slots only. No other action, condition or expression is exposed, and condition stubs return false. No SC1-only ACEs are added.
+These IDs and parameter types match the selected AssArray ACE metadata used by the SC2 target. Binary metadata from the original AssArray MFX reports 45 action, 27 condition and 30 expression slots. The replacement now preserves those complete dispatch-table extents with inert stubs for unsupported IDs, while exposing only the five SC2 ACEs in the editor menus. No SC1-only ACEs are added. This table-shape change is intended to improve Fusion's Replace by Another Object compatibility; it still needs verification in Fusion itself.
 
 Matching IDs/signatures are intended to preserve the relevant events during Replace Object. The actual operation still needs to be exercised on a copy of the target MFA; CI does not have that MFA and cannot verify conversion behavior.
 

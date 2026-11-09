@@ -40,15 +40,41 @@ for signature in signatures:
 require("numOfActions = static_cast<short>(std::size(actions))" in GENERAL,
         "runtime action count must be derived from the reserved ACE-ID table")
 require("numOfConditions = static_cast<short>(std::size(conditions))" in GENERAL,
-        "runtime must preserve the 12 condition slots")
+        "runtime condition count must match its legacy table")
 require("numOfExpressions = static_cast<short>(std::size(expressions))" in GENERAL,
-        "runtime expression count must match its table")
-require("action_set_value_at_key, // 0" in GENERAL, "action ID 0 is not mapped to Set Value at Key")
-require("action_clear_array,      // 3" in GENERAL, "action ID 3 is not mapped to Clear the Array")
-require("action_load_ini_file_into_values, // 12" in GENERAL, "action ID 12 is not mapped to Load INI")
-require("action_save_ini_file_from_values // 14" in GENERAL, "action ID 14 is not mapped to Save INI")
-require("condition_unused, condition_unused, condition_unused, condition_unused,\n        condition_unused, condition_unused, condition_unused, condition_unused,\n        condition_unused, condition_unused, condition_unused, condition_unused" in GENERAL,
-        "expected exactly 12 inert condition slots")
+        "runtime expression count must match its legacy table")
+
+def table_entries(array_name: str, entry_pattern: str) -> list[str]:
+    match = re.search(
+        rf"static fusion::[a-z_]+_func_pointer {array_name}\[\] = \{{(.*?)\n    \}};",
+        GENERAL,
+        re.DOTALL,
+    )
+    require(match is not None, f"missing runtime {array_name} dispatch table")
+    return re.findall(entry_pattern, match.group(1))
+
+
+action_entries = table_entries("actions", r"\baction_[a-z_]+\b")
+condition_entries = table_entries("conditions", r"\bcondition_[a-z_]+\b")
+expression_entries = table_entries("expressions", r"\bexpression_[a-z_]+\b")
+require(len(action_entries) == 45,
+        f"replacement action table must preserve all 45 original AssArray IDs, found {len(action_entries)}")
+require(len(condition_entries) == 27,
+        f"replacement condition table must preserve all 27 original AssArray IDs, found {len(condition_entries)}")
+require(len(expression_entries) == 30,
+        f"replacement expression table must preserve all 30 original AssArray IDs, found {len(expression_entries)}")
+require(action_entries[0] == "action_set_value_at_key", "action ID 0 is not mapped to Set Value at Key")
+require(action_entries[3] == "action_clear_array", "action ID 3 is not mapped to Clear the Array")
+require(action_entries[12] == "action_load_ini_file_into_values", "action ID 12 is not mapped to Load INI")
+require(action_entries[14] == "action_save_ini_file_from_values", "action ID 14 is not mapped to Save INI")
+require(expression_entries[0] == "expression_get_value", "expression ID 0 is not mapped to GetValue")
+require(all(name == "condition_unused" for name in condition_entries),
+        "all unsupported condition slots must remain inert")
+require(all(name == "action_unused" for index, name in enumerate(action_entries)
+            if index not in {0, 3, 12, 14}),
+        "all non-SC2 action slots must remain inert")
+require(all(name == "expression_unused" for name in expression_entries[1:]),
+        "all non-SC2 expression slots must remain inert")
 
 # Windows editor object, Android exporter registration and package all use the separate identity.
 require('KPX_NAME "ASSARRAYSC2"' in RC, "MFX KPX_NAME must not register as ASSARRAY")

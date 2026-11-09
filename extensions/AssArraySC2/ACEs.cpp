@@ -106,6 +106,15 @@ auto FUSION_API condition_unused(RunData* const, std::int32_t const, std::int32_
 #endif
 
 #ifdef FUSION_EXPRESSIONS
+auto FUSION_API expression_unused(RunData* const run_data, std::int32_t const) noexcept
+    -> std::int32_t
+{
+    // Preserve the original AssArray expression table extent without exposing
+    // unsupported expression IDs in the editor.
+    run_data->rHo.hoFlags |= HOF_FLOAT;
+    return float_result(0.0F);
+}
+
 auto FUSION_API expression_get_value(RunData* const run_data, std::int32_t const params_handle) noexcept
     -> std::int32_t
 {
