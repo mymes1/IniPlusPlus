@@ -39,13 +39,14 @@ The MFX advertises Fusion build 295 compatibility. Windows CI run [42492164267](
 
 ### Fusion Replace Object workflow
 
-1. Back up the MFA and install the separate Edittime/Runtime MFX pair above.
+1. Back up the MFA and install the separate Edittime/Runtime MFX pair above; restart Fusion.
 2. Open a copy of the Sonic Classic 2 MFA in Fusion 2.5 build 295.
-3. Use Fusion's Replace Object command to replace the original AssArray instance with **AssArray SC2 Compatible**.
-4. Verify the four targeted actions and `GetValue` expression remain attached with the same IDs/parameters; do not convert the events manually as part of this task.
-5. Run the game and check its existing load/save/GetValue behavior.
+3. In the Frame Editor, use **Create New Object** to place one temporary **AssArray SC2 Compatible** instance in the same frame as the original AssArray. Fusion's Replace Object list is populated from object types present in that frame; installing the MFX alone does not add it to the list.
+4. In the Event Editor, use **Replace by Another Object** on the original AssArray and choose **AssArray SC2 Compatible**.
+5. Verify the four targeted actions and `GetValue` expression remain attached with the same IDs/parameters; do not convert the events manually as part of this task. Remove the temporary instance if it is left over after replacement.
+6. Run the game and check its existing load/save/GetValue behavior.
 
-The new object has a different identity and does not replace the original `ASSARRAY` extension globally. The actual MFA conversion and game runtime have not been verified here.
+If **AssArray SC2 Compatible** is missing from **Create New Object**, check that `AssArraySC2.mfx` is installed under `<Fusion>/Extensions/Unicode/` and restart Fusion. The Runtime MFX must also be installed under `<Fusion>/Data/Runtime/Unicode/` to run the game. The new object has a different identity and does not replace the original `ASSARRAY` extension globally. The actual MFA conversion and game runtime have not been verified here.
 
 ## Runtime format boundaries
 

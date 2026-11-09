@@ -51,7 +51,7 @@ Close Fusion first and back up any existing files. From the extracted `windows-m
 - `runtime/AssArraySC2.mfx` to `<Fusion 2.5>/Data/Runtime/Unicode/AssArraySC2.mfx`
 - `edittime/AssArraySC2.mfx` to `<Fusion 2.5>/Extensions/Unicode/AssArraySC2.mfx`
 
-Restart Fusion and open a **copy** of the Sonic MFA. Use Fusion's Replace Object workflow to select **AssArray SC2 Compatible** for the original AssArray object. Verify the four targeted actions and `GetValue` retain their IDs and parameters without manual event conversion. This replacement is intended to preserve those events; CI cannot verify the editor operation or target MFA behavior. The new MFX has its own internal identity and does not replace the original `ASSARRAY` installation. For manual MSBuild commands, see [BUILD.md](BUILD.md).
+Restart Fusion and open a **copy** of the Sonic MFA. In the Frame Editor, create one temporary **AssArray SC2 Compatible** instance in the same frame as the original AssArray; Fusion's Replace Object list only offers object types present in that frame. Then, in the Event Editor, use **Replace by Another Object** on AssArray and choose the new object. If it is missing from **Create New Object**, recheck the Edittime MFX path and restart Fusion. Verify the four targeted actions and `GetValue` retain their IDs and parameters without manual event conversion; remove the temporary instance if it remains extra. This replacement is intended to preserve those events; CI cannot verify the editor operation or target MFA behavior. The new MFX has its own internal identity and does not replace the original `ASSARRAY` installation. For manual MSBuild commands, see [BUILD.md](BUILD.md).
 
 ## 5. Install and validate Android packages
 

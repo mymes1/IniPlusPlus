@@ -73,7 +73,7 @@ From a local MSVC build or the Windows CI artifact, install:
 
 The independent project is `extensions/AssArraySC2/AssArraySC2.vcxproj`; see [BUILD.md](BUILD.md). The new MFX uses the `lSDK` submodule and its own source/resources. The root `AssArray.mfx` and `AssArrayruntime.mfx` remain untouched prebuilt binaries and are not required to build the replacement.
 
-On a **copy** of the Sonic MFA, use Fusion's Replace Object workflow to select **AssArray SC2 Compatible**. Check that the four targeted actions and `GetValue` remain attached with the same IDs and parameters. CI cannot verify this editor operation; do not treat MFX compilation as proof that the replacement works in the target MFA.
+Restart Fusion and open a **copy** of the Sonic MFA. In the Frame Editor, use **Create New Object** to place one temporary **AssArray SC2 Compatible** instance in the same frame as the original AssArray; Fusion's Replace Object list is drawn from object types present in that frame. In the Event Editor, use **Replace by Another Object** on AssArray and select the new object. If it is absent from **Create New Object**, recheck the Edittime MFX under `<Fusion 2.5>/Extensions/Unicode/` and restart Fusion. Check that the four targeted actions and `GetValue` remain attached with the same IDs and parameters, then remove the temporary instance if it is extra. CI cannot verify this editor operation; do not treat MFX compilation as proof that the replacement works in the target MFA.
 
 ### Android runtime
 
