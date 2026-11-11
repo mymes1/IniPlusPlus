@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Tim Rules 3: The Open Door as a large-print 50-chapter book."""
+"""Build Tim Rules 3: The Open Door in the Books 1 and 2 text layout."""
 
 from pathlib import Path
 import re
@@ -37,22 +37,23 @@ def read_chapters(source=SOURCE):
 def build(output=OUTPUT):
     chapters = read_chapters()
     styles = make_styles()
-    styles["Story"].fontSize = 28
-    styles["Story"].leading = 36
-    styles["Story"].spaceAfter = 5
-    styles["Section"].fontSize = 11
-    styles["Section"].leading = 15
-    styles["Section"].spaceBefore = 18
-    styles["Section"].spaceAfter = 12
-    styles["ChapterTitle"].fontSize = 24
-    styles["ChapterTitle"].leading = 29
-    styles["BookTitle"].fontSize = 31
-    styles["BookSubtitle"].fontSize = 14
-    styles["BookSubtitle"].leading = 19
+    # Match the body text and layout of Books 1 and 2 exactly.
+    styles["Story"].fontSize = 10.5
+    styles["Story"].leading = 14.2
+    styles["Story"].spaceAfter = 2.5
+    styles["Section"].fontSize = 8.5
+    styles["Section"].leading = 12
+    styles["Section"].spaceBefore = 13
+    styles["Section"].spaceAfter = 9
+    styles["ChapterTitle"].fontSize = 20
+    styles["ChapterTitle"].leading = 25
+    styles["BookTitle"].fontSize = 35
+    styles["BookSubtitle"].fontSize = 12
+    styles["BookSubtitle"].leading = 17
     width, height = PAGE_SIZE
     doc = BookDocTemplate(
         str(output), pagesize=PAGE_SIZE,
-        leftMargin=17*mm, rightMargin=17*mm, topMargin=20*mm, bottomMargin=20*mm,
+        leftMargin=19*mm, rightMargin=19*mm, topMargin=21*mm, bottomMargin=21*mm,
         title="Tim Rules 3 — The Open Door", author="",
         subject="The complete 50-chapter third Tim Rules book",
         creator="Tim Rules manuscript compiler",
@@ -70,8 +71,8 @@ def build(output=OUTPUT):
     ]
     toc = TableOfContents()
     toc.levelStyles = [ParagraphStyle(
-        name="TOCChapter", fontName="Times-Roman", fontSize=11, leading=16,
-        leftIndent=0, firstLineIndent=0, rightIndent=15, textColor=INK,
+        name="TOCChapter", fontName="Times-Roman", fontSize=9, leading=13,
+        leftIndent=0, firstLineIndent=0, rightIndent=12, textColor=INK,
     )]
     toc.dotsMinLevel = 0
     story.extend([toc, NextPageTemplate("Body"), PageBreak()])
